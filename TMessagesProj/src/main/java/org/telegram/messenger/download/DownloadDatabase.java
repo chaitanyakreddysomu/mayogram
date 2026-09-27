@@ -59,6 +59,7 @@ public class DownloadDatabase extends SQLiteOpenHelper {
                 "downloaded_size INTEGER," +
                 "status INTEGER NOT NULL," +
                 "saved_uri TEXT," +
+                "internal_path TEXT," +
                 "created_at INTEGER," +
                 "updated_at INTEGER," +
                 "UNIQUE(account, dialog_id, message_id) ON CONFLICT REPLACE" +
@@ -85,6 +86,7 @@ public class DownloadDatabase extends SQLiteOpenHelper {
         cv.put("downloaded_size", r.downloadedSize);
         cv.put("status", r.status);
         cv.put("saved_uri", r.savedUri);
+        cv.put("internal_path", r.internalPath);
         cv.put("created_at", r.createdAt);
         cv.put("updated_at", r.updatedAt);
         return cv;
@@ -108,6 +110,7 @@ public class DownloadDatabase extends SQLiteOpenHelper {
         r.downloadedSize = c.getLong(c.getColumnIndexOrThrow("downloaded_size"));
         r.status = c.getInt(c.getColumnIndexOrThrow("status"));
         r.savedUri = c.getString(c.getColumnIndexOrThrow("saved_uri"));
+        r.internalPath = c.getString(c.getColumnIndexOrThrow("internal_path"));
         r.createdAt = c.getLong(c.getColumnIndexOrThrow("created_at"));
         r.updatedAt = c.getLong(c.getColumnIndexOrThrow("updated_at"));
         return r;
@@ -139,10 +142,11 @@ public class DownloadDatabase extends SQLiteOpenHelper {
         getWritableDatabase().update(TABLE, cv, "id=?", new String[]{String.valueOf(id)});
     }
 
-    public synchronized void markCompleted(long id, String savedUri) {
+    public synchronized void markCompleted(long id, String savedUri, String internalPath) {
         ContentValues cv = new ContentValues();
         cv.put("status", DownloadRecord.STATUS_COMPLETED);
         cv.put("saved_uri", savedUri);
+        cv.put("internal_path", internalPath);
         cv.put("updated_at", System.currentTimeMillis());
         getWritableDatabase().update(TABLE, cv, "id=?", new String[]{String.valueOf(id)});
     }

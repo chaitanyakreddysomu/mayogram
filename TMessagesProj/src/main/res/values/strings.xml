@@ -22,6 +22,7 @@
     <string name="DownloadManagerStatusPaused">Paused</string>
     <string name="DownloadManagerStatusCompleted">Completed</string>
     <string name="DownloadManagerStatusFailed">Failed</string>
+    <string name="DownloadManagerShareFileMissing">The downloaded file is no longer available locally. Try downloading it again.</string>
     <string name="LanguageName">English</string>
     <string name="English">English</string>
     <string name="LanguageNameInEnglish">English</string>

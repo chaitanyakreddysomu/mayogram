@@ -21,6 +21,8 @@ public class DownloadRecord {
     public long downloadedSize;
     public int status;
     public String savedUri;
+    /** Absolute path to Telegram's internal cache copy; kept so the file can be re-uploaded later (share to another chat) without re-downloading. */
+    public String internalPath;
     public long createdAt;
     public long updatedAt;
 

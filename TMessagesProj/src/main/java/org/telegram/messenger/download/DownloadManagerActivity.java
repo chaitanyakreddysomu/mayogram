@@ -24,12 +24,17 @@ import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.DialogsActivity;
+
+import android.os.Bundle;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -118,6 +123,13 @@ public class DownloadManagerActivity extends BaseFragment implements Notificatio
         row.setOrientation(LinearLayout.VERTICAL);
         row.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         row.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(10), AndroidUtilities.dp(16), AndroidUtilities.dp(10));
+        if (record.status == DownloadRecord.STATUS_COMPLETED) {
+            row.setLongClickable(true);
+            row.setOnLongClickListener(v -> {
+                openSharePicker(record);
+                return true;
+            });
+        }
         LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         rowParams.bottomMargin = AndroidUtilities.dp(2);
@@ -199,6 +211,35 @@ public class DownloadManagerActivity extends BaseFragment implements Notificatio
             default:
                 return LocaleController.getString(R.string.DownloadManagerStatusFailed);
         }
+    }
+
+    private void openSharePicker(DownloadRecord record) {
+        Bundle args = new Bundle();
+        args.putBoolean("onlySelect", true);
+        args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
+        args.putBoolean("allowSwitchAccount", false);
+        DialogsActivity fragment = new DialogsActivity(args);
+        fragment.setDelegate((DialogsActivity picker, ArrayList<MessagesStorage.TopicKey> dids,
+                               CharSequence message, boolean param, boolean notify,
+                               int scheduleDate, int scheduleRepeatPeriod, org.telegram.ui.TopicsFragment topicsFragment) -> {
+            ArrayList<Long> dialogIds = new ArrayList<>();
+            for (MessagesStorage.TopicKey key : dids) {
+                dialogIds.add(key.dialogId);
+            }
+            MayoDownloadManager.ShareResult result =
+                    MayoDownloadManager.getInstance(currentAccount).shareToChats(record, dialogIds);
+            if (result == MayoDownloadManager.ShareResult.FILE_MISSING) {
+                if (getParentActivity() != null) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                    builder.setMessage(LocaleController.getString(R.string.DownloadManagerShareFileMissing));
+                    builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
+                    builder.show();
+                }
+            }
+            picker.finishFragment();
+            return true;
+        });
+        presentFragment(fragment);
     }
 
     private String sizeLabel(DownloadRecord record) {

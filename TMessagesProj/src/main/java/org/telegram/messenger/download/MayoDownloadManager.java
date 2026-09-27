@@ -28,6 +28,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.webkit.MimeTypeMap;
 
+import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.DownloadController;
@@ -35,6 +36,7 @@ import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLRPC;
@@ -235,6 +237,43 @@ public class MayoDownloadManager {
         db.clearCompletedForAccount(currentAccount);
     }
 
+    /**
+     * Uploads a completed download as a new message to each of the given chats. This
+     * is a fresh upload via Telegram's normal send pipeline (SendMessagesHelper), the
+     * same one used for attaching a file from storage - not a re-forward of any
+     * original message, since none may exist by this point in the flow.
+     */
+    public ShareResult shareToChats(DownloadRecord record, java.util.List<Long> dialogIds) {
+        if (record == null || record.status != DownloadRecord.STATUS_COMPLETED
+                || record.internalPath == null) {
+            return ShareResult.FILE_MISSING;
+        }
+        File source = new File(record.internalPath);
+        if (!source.exists()) {
+            return ShareResult.FILE_MISSING;
+        }
+
+        AccountInstance accountInstance = AccountInstance.getInstance(currentAccount);
+        for (long dialogId : dialogIds) {
+            if (record.category == DownloadCategory.PHOTO) {
+                SendMessagesHelper.prepareSendingPhoto(
+                        accountInstance, record.internalPath, (Uri) null, dialogId,
+                        null, null, null, null, null, null, null, 0,
+                        null, true, 0, 0, null);
+            } else {
+                SendMessagesHelper.prepareSendingDocument(
+                        accountInstance, record.internalPath, record.internalPath, null,
+                        null, record.mimeType, dialogId, null, null, null, null, null,
+                        true, 0, null, null, false);
+            }
+        }
+        return ShareResult.OK;
+    }
+
+    public enum ShareResult {
+        OK, FILE_MISSING
+    }
+
     // ------------------------------------------------------------------
     // FileLoader observation
     // ------------------------------------------------------------------
@@ -326,10 +365,13 @@ public class MayoDownloadManager {
         activeByFileName.remove(fileName);
 
         Utilities.globalQueue.postRunnable(() -> {
-            String uri = copyToPublicDownloads(record, messageObject);
+            File internal = resolveInternalFile(record, messageObject);
+            String internalPath = internal != null ? internal.getAbsolutePath() : null;
+            String uri = copyToPublicDownloads(record, messageObject, internal);
             record.status = DownloadRecord.STATUS_COMPLETED;
             record.savedUri = uri;
-            db.markCompleted(record.id, uri);
+            record.internalPath = internalPath;
+            db.markCompleted(record.id, uri, internalPath);
             AndroidUtilities.runOnUIThread(() -> notifyUpdated(record));
         });
     }
@@ -338,9 +380,8 @@ public class MayoDownloadManager {
     // Organized storage: Download/Mayogram/<chat>/<category>/<file>
     // ------------------------------------------------------------------
 
-    private String copyToPublicDownloads(DownloadRecord record, MessageObject messageObject) {
+    private String copyToPublicDownloads(DownloadRecord record, MessageObject messageObject, File source) {
         try {
-            File source = resolveInternalFile(record, messageObject);
             if (source == null || !source.exists()) {
                 FileLog.e("Mayogram: source file missing for " + record.fileName);
                 return null;
