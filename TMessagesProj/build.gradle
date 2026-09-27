@@ -143,6 +143,12 @@ android {
         minSdkVersion 21
         targetSdkVersion 36
 
+        // Telegram API credentials. Resolved from local.properties, then the
+        // environment (for CI), then Telegram's public placeholder values so a
+        // checkout without credentials still builds. See getSecret() below.
+        buildConfigField "int", "APP_ID", getSecret("APP_ID", "TELEGRAM_APP_ID", "4")
+        buildConfigField "String", "APP_HASH", "\"" + getSecret("APP_HASH", "TELEGRAM_APP_HASH", "014b35b6184100b085b0d0572f9b5103") + "\""
+
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 
         multiDexEnabled true
@@ -239,6 +245,17 @@ android {
     namespace 'org.telegram.messenger'
 }
 
+
+def getSecret(String propName, String envName, String fallback) {
+    def value = getProps(propName)
+    if (value == null || value.toString().isEmpty()) {
+        value = System.getenv(envName)
+    }
+    if (value == null || value.toString().isEmpty()) {
+        value = fallback
+    }
+    return value.toString()
+}
 
 def getProps(String propName) {
     def propsFile = rootProject.file('local.properties')
