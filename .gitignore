@@ -18,3 +18,7 @@ TMessagesProj/jni/ffmpeg/build_android
 # JVM crash dumps
 hs_err_pid*.log
 replay_pid*.log
+
+# Private signing key - never commit
+TMessagesProj/config/mayogram.keystore
+*.jks

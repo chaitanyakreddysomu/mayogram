@@ -51,6 +51,21 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Signing key comes from a secret, never from the repository. Without it
+      # the build falls back to the committed dummy keystore, so forks still build.
+      - name: Decode signing keystore
+        if: env.KEYSTORE_BASE64 != ''
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > TMessagesProj/config/mayogram.keystore
+          {
+            echo "ORG_GRADLE_PROJECT_RELEASE_STORE_FILE=mayogram.keystore"
+            echo "ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS=mayogram"
+            echo "ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}"
+          } >> "$GITHUB_ENV"
+
       - name: Build debug APK
         run: ./gradlew :TMessagesProj_App:assembleAfatDebug --stacktrace
 
