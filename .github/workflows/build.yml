@@ -27,11 +27,24 @@ jobs:
                       /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
           df -h /
 
-      # submodules are mandatory: the native build does not exist without them.
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 1
+
+      # Submodules are fetched separately rather than by actions/checkout.
+      # checkout fetches them shallowly, and chromium.googlesource.com (libyuv)
+      # serves Gitiles, which refuses `fetch <sha>` for a non-tip commit, so a
+      # shallow submodule fetch fails with "nonexistent object". A full fetch
+      # works. Retried because these hosts are occasionally flaky.
+      - name: Fetch submodules
+        run: |
+          for i in 1 2 3; do
+            git submodule sync --recursive
+            git submodule update --init --recursive && exit 0
+            echo "submodule fetch failed (attempt $i), retrying..."
+            sleep 15
+          done
+          exit 1
 
       - uses: actions/setup-java@v4
         with:
@@ -39,6 +52,10 @@ jobs:
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Default is "tools platform-tools"; the obsolete `tools` package no
+          # longer exists in the SDK repository and fails the install.
+          packages: platform-tools
 
       # Versions are pinned by the project's build.gradle; keep them in step.
       - name: Install SDK packages
