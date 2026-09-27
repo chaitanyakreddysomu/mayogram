@@ -2,6 +2,14 @@
 <resources>
     <string name="AppName">Mayogram</string>
     <string name="AppNameBeta">Mayogram</string>
+    <string name="AccessCodeTitle">Access Code</string>
+    <string name="AccessCodeSubtitle">Enter the access code you were given to activate this app on this device.</string>
+    <string name="AccessCodeHint">XXXX-XXXX-XXXX</string>
+    <string name="AccessCodeContinue">Continue</string>
+    <string name="AccessCodeEmpty">Enter access code</string>
+    <string name="AccessCodeInvalid">Invalid access code</string>
+    <string name="AccessCodeUsed">This access code has already been used</string>
+    <string name="AccessCodeConnectionError">Connection error. Please try again.</string>
     <string name="LanguageName">English</string>
     <string name="English">English</string>
     <string name="LanguageNameInEnglish">English</string>

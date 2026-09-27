@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mayogram Access Codes</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="lock" class="lock">
+  <div class="lock-card">
+    <h1>Mayogram Admin</h1>
+    <p class="muted">Enter the admin password to manage access codes.</p>
+    <input id="password" type="password" placeholder="Admin password" autocomplete="current-password">
+    <button id="unlock" class="btn primary">Unlock</button>
+    <p id="lockError" class="error" hidden></p>
+  </div>
+</div>
+
+<main id="app" hidden>
+  <header class="topbar">
+    <div>
+      <h1>Access Codes</h1>
+      <p class="muted" id="summary">Loading…</p>
+    </div>
+    <div class="actions">
+      <input id="count" type="number" min="1" max="100" value="1" title="How many codes to generate">
+      <button id="generate" class="btn primary">Generate</button>
+      <button id="refresh" class="btn">Refresh</button>
+      <button id="lockBtn" class="btn ghost">Lock</button>
+    </div>
+  </header>
+
+  <p id="banner" class="banner" hidden></p>
+
+  <div class="table-wrap">
+    <table id="table">
+      <thead>
+        <tr>
+          <th>Access token</th>
+          <th>Status</th>
+          <th>Device</th>
+          <th>Installation ID</th>
+          <th>Telegram user</th>
+          <th>Created</th>
+          <th>Used</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="muted empty" hidden>No access codes yet. Press Generate to create one.</p>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

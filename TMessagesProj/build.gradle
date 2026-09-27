@@ -149,6 +149,12 @@ android {
         buildConfigField "int", "APP_ID", getSecret("APP_ID", "TELEGRAM_APP_ID", "4")
         buildConfigField "String", "APP_HASH", "\"" + getSecret("APP_HASH", "TELEGRAM_APP_HASH", "014b35b6184100b085b0d0572f9b5103") + "\""
 
+        // Supabase access-code backend. Same resolution order as the Telegram
+        // credentials: local.properties, then environment, then empty (which
+        // disables the access-code gate so the app still builds and runs).
+        buildConfigField "String", "SUPABASE_URL", "\"" + getSecret("SUPABASE_URL", "SUPABASE_URL", "") + "\""
+        buildConfigField "String", "SUPABASE_ANON_KEY", "\"" + getSecret("SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "") + "\""
+
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 
         multiDexEnabled true

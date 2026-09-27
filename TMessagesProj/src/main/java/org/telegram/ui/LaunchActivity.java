@@ -94,6 +94,7 @@ import com.google.firebase.appindexing.builders.AssistActionBuilder;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
+import org.telegram.messenger.AccessCodeController;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimationNotificationsLocker;
 import org.telegram.messenger.ApplicationLoader;
@@ -1086,6 +1087,12 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private BaseFragment getClientNotActivatedFragment() {
+        // Mayogram: the access-code gate precedes Telegram's own login. It
+        // authorises this installation to use the app and is independent of the
+        // Telegram account session established afterwards.
+        if (!AccessCodeController.isAuthorized()) {
+            return new AccessCodeActivity();
+        }
         if (LoginActivity.loadCurrentState(false, currentAccount).getInt("currentViewNum", 0) != 0) {
             return new LoginActivity();
         }

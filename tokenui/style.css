@@ -1,0 +1,169 @@
+:root {
+  --bg: #14161c;
+  --surface: #1c1f27;
+  --surface-2: #232733;
+  --border: #2c313d;
+  --text: #e8eaf0;
+  --muted: #9aa1b1;
+  --accent: #6c4df6;
+  --accent-hover: #7d61f7;
+  --ok: #3fb96b;
+  --warn: #d9a441;
+  --danger: #e2574c;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4f5f8;
+    --surface: #ffffff;
+    --surface-2: #f0f1f5;
+    --border: #dfe2ea;
+    --text: #1b1d23;
+    --muted: #666d7d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  padding: 24px 16px 64px;
+}
+
+h1 { font-size: 22px; margin: 0 0 4px; }
+.muted { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* ---- lock screen ---- */
+.lock {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lock-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 360px;
+}
+.lock-card h1 { margin-bottom: 6px; }
+.lock-card input { margin: 18px 0 12px; }
+
+/* ---- controls ---- */
+input {
+  width: 100%;
+  padding: 11px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 15px;
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.btn {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn.ghost { background: transparent; }
+.lock-card .btn { width: 100%; }
+
+/* ---- layout ---- */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto 18px;
+}
+.actions { display: flex; gap: 8px; align-items: center; }
+.actions input { width: 72px; text-align: center; }
+
+.banner {
+  max-width: 1200px;
+  margin: 0 auto 14px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  background: rgba(63, 185, 107, .12);
+  border: 1px solid rgba(63, 185, 107, .35);
+  font-size: 14px;
+}
+.banner.bad {
+  background: rgba(226, 87, 76, .12);
+  border-color: rgba(226, 87, 76, .4);
+}
+.error { color: var(--danger); font-size: 14px; margin: 8px 0 0; }
+
+/* ---- table ---- */
+.table-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow-x: auto;
+}
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+th, td {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  vertical-align: middle;
+}
+th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+  font-weight: 600;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-2); }
+
+.token {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+.token:hover { color: var(--accent); }
+
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.pill.active  { background: rgba(63,185,107,.15); color: var(--ok); }
+.pill.used    { background: rgba(154,161,177,.15); color: var(--muted); }
+.pill.revoked { background: rgba(226,87,76,.15); color: var(--danger); }
+
+.dim { color: var(--muted); }
+.empty { padding: 32px; text-align: center; }
+
+@media (max-width: 640px) {
+  .topbar { flex-direction: column; align-items: stretch; }
+  .actions { flex-wrap: wrap; }
+}
