@@ -681,7 +681,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         {
             int channelsCount = org.telegram.messenger.ChannelMembershipCounter.getCurrentCount(currentAccount);
             int channelsLimit = org.telegram.messenger.ChannelMembershipCounter.getLimit(currentAccount);
-            items.add(UItem.asButton(MAYO_CHANNELS_COUNTER_ID,
+            // msg_retry doubles as a refresh glyph here; there's no dedicated
+            // "refresh" drawable in this resource set. Tapping the row
+            // recomputes the count immediately (see MAYO_CHANNELS_COUNTER_ID
+            // in onClick) rather than requiring the user to reopen the app.
+            items.add(UItem.asButton(MAYO_CHANNELS_COUNTER_ID, R.drawable.msg_retry,
                     getString(R.string.ChannelsCounterRow), channelsCount + " / " + channelsLimit));
             items.add(UItem.asShadow(null));
         }
@@ -782,6 +786,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private void onClick(UItem item, View view, int position, float x, float y) {
+        if (item.id == MAYO_CHANNELS_COUNTER_ID) {
+            listView.adapter.update(true);
+            return;
+        }
         if (item.object instanceof TLRPC.TL_attachMenuBot) {
             TLRPC.TL_attachMenuBot attachMenuBot = (TLRPC.TL_attachMenuBot) item.object;
             if (attachMenuBot.inactive || attachMenuBot.side_menu_disclaimer_needed) {

@@ -600,6 +600,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int delete_group = 45;
     private final static int enable_no_forwards = 46;
     private final static int disable_no_forwards = 47;
+    private final static int invite_links_shortcut = 48;
 
     private Rect rect = new Rect();
 
@@ -2642,6 +2643,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 } else if (id == report) {
                     ReportBottomSheet.openChat(ProfileActivity.this, getDialogId());
+                } else if (id == invite_links_shortcut) {
+                    ManageLinksActivity linksFragment = new ManageLinksActivity(chatId, 0, 0);
+                    linksFragment.setInfo(chatInfo, chatInfo != null ? chatInfo.exported_invite : null);
+                    presentFragment(linksFragment);
                 } else if (id == edit_channel) {
                     if (isTopic) {
                         presentFragment(TopicCreateFragment.create(chatId, topicId));
@@ -4038,6 +4043,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         } else {
             editItem = menu.addItem(edit_channel, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString(R.string.Edit));
+            if (chatId != 0 && currentChat != null && !isTopic) {
+                ActionBarMenuItem inviteLinksItem = menu.addItem(invite_links_shortcut, R.drawable.msg_link);
+                inviteLinksItem.setContentDescription(LocaleController.getString(R.string.InviteLink));
+            }
         }
         otherItem = menu.addItem(10, R.drawable.ic_ab_other, resourcesProvider);
 

@@ -33,7 +33,15 @@ public class ChannelMembershipCounter {
                 continue;
             }
             TLRPC.Chat chat = controller.getChat(-dialogId);
-            if (chat != null && ChatObject.isChannel(chat)) {
+            // Excludes ChatObject.isNotInChat(): Telegram injects a sponsored/
+            // promoted channel into the dialog list sometimes (MessagesController's
+            // private promoDialog/isLeftPromoChannel) which is backed by a real,
+            // resolvable Chat object the user is NOT a member of. Without this
+            // check that ad would count as a joined channel, and the count would
+            // drift by however many promo entries the server happens to be
+            // showing at that moment - exactly the "count sometimes different"
+            // symptom this was chasing.
+            if (chat != null && ChatObject.isChannel(chat) && !ChatObject.isNotInChat(chat)) {
                 count++;
             }
         }
