@@ -100,6 +100,8 @@ public class DataSettingsActivity extends BaseFragment {
     private int proxySectionRow;
     @Keep
     private int proxyRow;
+    @Keep
+    private int downloadManagerRow;
     private int proxySection2Row;
     @Keep
     private int clearDraftsRow;
@@ -196,6 +198,7 @@ public class DataSettingsActivity extends BaseFragment {
         callsSection2Row = rowCount++;
         proxySectionRow = rowCount++;
         proxyRow = rowCount++;
+        downloadManagerRow = rowCount++;
         proxySection2Row = rowCount++;
         clearDraftsRow = rowCount++;
         clearDraftsSectionRow = rowCount++;
@@ -550,6 +553,8 @@ public class DataSettingsActivity extends BaseFragment {
                 showDialog(builder.create());
             } else if (position == proxyRow) {
                 presentFragment(new ProxyListActivity());
+            } else if (position == downloadManagerRow) {
+                presentFragment(new org.telegram.messenger.download.DownloadManagerActivity());
             } else if (position == enableStreamRow) {
                 SharedConfig.toggleStreamMedia();
                 TextCheckCell textCheckCell = (TextCheckCell) view;
@@ -715,6 +720,9 @@ public class DataSettingsActivity extends BaseFragment {
                     } else if (position == proxyRow) {
                         textCell.setIcon(0);
                         textCell.setText(LocaleController.getString(R.string.ProxySettings), false);
+                    } else if (position == downloadManagerRow) {
+                        textCell.setIcon(0);
+                        textCell.setText(LocaleController.getString(R.string.DownloadManagerRow), false);
                     } else if (position == resetDownloadRow) {
                         textCell.setIcon(0);
                         textCell.setCanDisable(true);
@@ -883,7 +891,7 @@ public class DataSettingsActivity extends BaseFragment {
         }
 
         public boolean isRowEnabled(int position) {
-            return position == mobileRow || position == roamingRow || position == wifiRow || position == storageUsageRow || position == useLessDataForCallsRow || position == dataUsageRow || position == proxyRow || position == clearDraftsRow ||
+            return position == mobileRow || position == roamingRow || position == wifiRow || position == storageUsageRow || position == useLessDataForCallsRow || position == dataUsageRow || position == proxyRow || position == downloadManagerRow || position == clearDraftsRow ||
                     position == enableCacheStreamRow || position == enableStreamRow || position == enableAllStreamRow || position == enableMkvRow || position == quickRepliesRow || position == autoplayVideoRow || position == autoplayGifsRow ||
                     position == storageNumRow || position == saveToGalleryGroupsRow || position == saveToGalleryPeerRow || position == saveToGalleryChannelsRow || position == resetDownloadRow;
         }
