@@ -1686,6 +1686,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int charge_fee = 72;
 
     private final static int chat_menu_topic_create = 73;
+    private final static int channel_appearance = 74;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -4021,6 +4022,8 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (id == change_colors) {
                     showChatThemeBottomSheet();
+                } else if (id == channel_appearance) {
+                    presentFragment(new org.telegram.messenger.appearance.ChannelAppearanceActivity(getDialogId()));
                 } else if (id == topic_close) {
                     if (forumTopic == null)
                         return;
@@ -4438,6 +4441,10 @@ public class ChatActivity extends BaseFragment implements
             if (!isTopic && !ChatObject.isMonoForum(currentChat)) {
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear,
                     LocaleController.getString(UserObject.isBotForum(currentUser) ? R.string.ClearAllHistory : R.string.ClearHistory));
+            }
+            if (ChatObject.isChannel(currentChat)) {
+                headerItem.lazilyAddSubItem(channel_appearance, R.drawable.msg_palette,
+                        LocaleController.getString(R.string.ChannelAppearanceMenuItem));
             }
             boolean addedSettings = false;
             if (!isTopic) {
