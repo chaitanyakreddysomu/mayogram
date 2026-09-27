@@ -102,6 +102,8 @@ public class DataSettingsActivity extends BaseFragment {
     private int proxyRow;
     @Keep
     private int downloadManagerRow;
+    @Keep
+    private int channelsCounterRow;
     private int proxySection2Row;
     @Keep
     private int clearDraftsRow;
@@ -199,6 +201,7 @@ public class DataSettingsActivity extends BaseFragment {
         proxySectionRow = rowCount++;
         proxyRow = rowCount++;
         downloadManagerRow = rowCount++;
+        channelsCounterRow = rowCount++;
         proxySection2Row = rowCount++;
         clearDraftsRow = rowCount++;
         clearDraftsSectionRow = rowCount++;
@@ -723,6 +726,11 @@ public class DataSettingsActivity extends BaseFragment {
                     } else if (position == downloadManagerRow) {
                         textCell.setIcon(0);
                         textCell.setText(LocaleController.getString(R.string.DownloadManagerRow), false);
+                    } else if (position == channelsCounterRow) {
+                        textCell.setIcon(0);
+                        int count = org.telegram.messenger.ChannelMembershipCounter.getCurrentCount(currentAccount);
+                        int limit = org.telegram.messenger.ChannelMembershipCounter.getLimit(currentAccount);
+                        textCell.setTextAndValue(LocaleController.getString(R.string.ChannelsCounterRow), count + " / " + limit, false);
                     } else if (position == resetDownloadRow) {
                         textCell.setIcon(0);
                         textCell.setCanDisable(true);

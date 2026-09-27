@@ -35,6 +35,7 @@
     <string name="ChannelAppearanceWallpaperNone">No custom wallpaper set</string>
     <string name="ChannelAppearanceApply">Apply Changes</string>
     <string name="ChannelAppearanceApplied">Appearance updated for this device.</string>
+    <string name="ChannelsCounterRow">Channels &amp; Groups</string>
     <string name="LanguageName">English</string>
     <string name="English">English</string>
     <string name="LanguageNameInEnglish">English</string>
