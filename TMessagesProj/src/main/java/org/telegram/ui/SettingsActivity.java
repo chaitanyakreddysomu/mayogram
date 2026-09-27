@@ -610,6 +610,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
+    private static final int MAYO_CHANNELS_COUNTER_ID = 9001;
     private ArrayList<Integer> accountNumbers = new ArrayList<>();
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (searchItem.isSearchFieldVisible2()) {
@@ -674,6 +675,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                     getMessagesController().removeSuggestion(0, "VALIDATE_PASSWORD");
                 }
             ));
+            items.add(UItem.asShadow(null));
+        }
+
+        {
+            int channelsCount = org.telegram.messenger.ChannelMembershipCounter.getCurrentCount(currentAccount);
+            int channelsLimit = org.telegram.messenger.ChannelMembershipCounter.getLimit(currentAccount);
+            items.add(UItem.asButton(MAYO_CHANNELS_COUNTER_ID,
+                    getString(R.string.ChannelsCounterRow), channelsCount + " / " + channelsLimit));
             items.add(UItem.asShadow(null));
         }
 
