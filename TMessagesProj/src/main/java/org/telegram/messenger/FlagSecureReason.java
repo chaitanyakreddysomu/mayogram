@@ -64,13 +64,13 @@ public class FlagSecureReason {
             return;
         }
 
-        if (isSecuredNow(window)) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE);
-            AndroidUtilities.logFlagSecure();
-        } else {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
-            AndroidUtilities.logFlagSecure();
-        }
+        // if (isSecuredNow(window)) {
+        //     window.addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        //     AndroidUtilities.logFlagSecure();
+        // } else {
+        //     window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        //     AndroidUtilities.logFlagSecure();
+        // }
     }
 
     public static boolean isSecuredNow(Window window) {

@@ -715,8 +715,8 @@ public class AudioPlayerAlert extends BottomSheet implements NotificationCenter.
         speedItems[3] = playbackSpeedButton.addSubItem(3, R.drawable.msg_speed_fast, LocaleController.getString(R.string.SpeedFast));
         speedItems[4] = playbackSpeedButton.addSubItem(4, R.drawable.msg_speed_veryfast, LocaleController.getString(R.string.SpeedVeryFast));
         speedItems[5] = playbackSpeedButton.addSubItem(5, R.drawable.msg_speed_superfast, LocaleController.getString(R.string.SpeedSuperFast));
-        speedItems[6] = playbackSpeedButton.addSubItem(6, R.drawable.msg_speed_superfast, LocaleController.getString(R.string.SpeedVerySuperFast));
-        speedItems[7] = playbackSpeedButton.addSubItem(7, R.drawable.msg_speed_superfast, LocaleController.getString(R.string.SpeedRabbit));
+        speedItems[6] = playbackSpeedButton.addSubItem(6, R.drawable.filled_fire, LocaleController.getString(R.string.SpeedVerySuperFast));
+        speedItems[7] = playbackSpeedButton.addSubItem(7, R.drawable.flash_on, LocaleController.getString(R.string.SpeedRabbit));
         if (AndroidUtilities.density >= 3.0f) {
             playbackSpeedButton.setPadding(0, 1, 0, 0);
         }

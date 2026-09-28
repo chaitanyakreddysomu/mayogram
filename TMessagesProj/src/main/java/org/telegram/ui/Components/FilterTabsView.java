@@ -400,17 +400,6 @@ public class FilterTabsView extends FrameLayout {
                 textOffsetX = (int) -textLayout.getLineLeft(0);
             }
 
-            if (currentTab.id != selectedTabId) {
-                // Own rounded outline per unselected tab, so each folder reads
-                // as its own chip. The selected tab already gets the animated
-                // filled pill drawn behind it by drawSelector().
-                float pillPad = dp(6);
-                float pillTop = (getMeasuredHeight() - dp(28)) / 2f;
-                tabPillPaint.setColor(Theme.getColor(unactiveTextColorKey, resourcesProvider));
-                tabPillPaint.setAlpha(46);
-                canvas.drawRoundRect(textX - pillPad, pillTop, textX + tabWidth + pillPad, pillTop + dp(28), dp(14), dp(14), tabPillPaint);
-            }
-
             float titleOffsetX = 0;
             if (animateTextChange) {
                 titleOffsetX = titleXOffset * (animateTextChangeOut ? changeProgress : 1f - changeProgress);
@@ -793,11 +782,6 @@ public class FilterTabsView extends FrameLayout {
     private final TextPaint textCounterPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint deletePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint counterPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    // Mayogram: gives every unselected folder tab its own rounded pill outline,
-    // so each folder reads as a separate chip instead of one continuous strip.
-    // The selected tab keeps the existing animated selectorDrawable pill drawn
-    // behind it by drawSelector(), so this is only drawn for the others.
-    private final Paint tabPillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private ColorFilter emojiColorFilter = new PorterDuffColorFilter(0, PorterDuff.Mode.SRC_IN);
 
     private final ArrayList<Tab> tabs = new ArrayList<>();
@@ -926,8 +910,6 @@ public class FilterTabsView extends FrameLayout {
         deletePaint.setStyle(Paint.Style.STROKE);
         deletePaint.setStrokeCap(Paint.Cap.ROUND);
         deletePaint.setStrokeWidth(dp(1.5f));
-        tabPillPaint.setStyle(Paint.Style.STROKE);
-        tabPillPaint.setStrokeWidth(dpf2(1f));
 
         selectorDrawable = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, null);
         float rad = AndroidUtilities.dpf2(14);

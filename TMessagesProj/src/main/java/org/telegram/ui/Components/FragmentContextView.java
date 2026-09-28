@@ -146,7 +146,7 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
     private ActionBarMenuItem playbackSpeedButton;
     private SpeedIconDrawable speedIcon;
     private ActionBarMenuSlider.SpeedSlider speedSlider;
-    private ActionBarMenuItem.Item[] speedItems = new ActionBarMenuItem.Item[6];
+    private ActionBarMenuItem.Item[] speedItems = new ActionBarMenuItem.Item[8];
     private FrameLayout silentButton;
     private ImageView silentButtonImage;
     private TextView joinButton;
@@ -235,7 +235,7 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
     private boolean checkImportAfterAnimation;
 
     private final static float[] speeds = new float[] {
-        .5f, 1f, 1.2f, 1.5f, 1.7f, 2f
+        .5f, 1f, 1.2f, 1.5f, 1.7f, 2f, 3f, 4f
     };
 
     @Override
@@ -883,6 +883,8 @@ public class FragmentContextView extends FrameLayout implements NotificationCent
         speedItems[3] = playbackSpeedButton.lazilyAddSubItem(3, R.drawable.msg_speed_fast, getString(R.string.SpeedFast));
         speedItems[4] = playbackSpeedButton.lazilyAddSubItem(4, R.drawable.msg_speed_veryfast, getString(R.string.SpeedVeryFast));
         speedItems[5] = playbackSpeedButton.lazilyAddSubItem(5, R.drawable.msg_speed_superfast, getString(R.string.SpeedSuperFast));
+        speedItems[6] = playbackSpeedButton.lazilyAddSubItem(6, R.drawable.filled_fire, getString(R.string.SpeedVerySuperFast));
+        speedItems[7] = playbackSpeedButton.lazilyAddSubItem(7, R.drawable.flash_on, getString(R.string.SpeedRabbit));
         if (AndroidUtilities.density >= 3.0f) {
             playbackSpeedButton.setPadding(0, 1, 0, 0);
         }
