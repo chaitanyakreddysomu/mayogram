@@ -793,6 +793,11 @@ public class ChatActivity extends BaseFragment implements
     private CharSequence formwardingNameText;
     private MessageObject forwardingMessage;
     private MessageObject.GroupedMessages forwardingMessageGroup;
+    private Bulletin mayoForwardProgressBulletin;
+    private Bulletin.ProgressLayout mayoForwardProgressLayout;
+    private java.util.HashSet<Long> mayoForwardProgressDialogIds;
+    private int mayoForwardProgressTotal;
+    private int mayoForwardProgressSent;
     private MessageObject.GroupedMessages replyingQuoteGroup;
     public MessageObject replyingTopMessage;
     private ReplyQuote replyingQuote;
@@ -3354,6 +3359,7 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
+        mayoStopForwardProgress();
         if (messageMetricsView != null) {
             messageMetricsView.finish();
         }
@@ -14374,6 +14380,60 @@ public class ChatActivity extends BaseFragment implements
         getConnectionsManager().bindRequestToGuid(linkSearchRequestId, classGuid);
     }
 
+    private void mayoStartForwardProgress(java.util.Collection<Long> dialogIds, int total) {
+        if (total <= 0 || getParentActivity() == null) {
+            return;
+        }
+        mayoStopForwardProgress();
+        mayoForwardProgressDialogIds = new java.util.HashSet<>(dialogIds);
+        mayoForwardProgressTotal = total;
+        mayoForwardProgressSent = 0;
+        mayoForwardProgressLayout = new Bulletin.ProgressLayout(getContext(), themeDelegate);
+        mayoForwardProgressLayout.textView.setText(LocaleController.getString(R.string.MayoForwardingMessagesTitle), false);
+        mayoForwardProgressLayout.setProgress(0f);
+        mayoForwardProgressBulletin = BulletinFactory.of(this).create(mayoForwardProgressLayout, -1);
+        mayoForwardProgressBulletin.hideAfterBottomSheet = false;
+        mayoForwardProgressBulletin.setCanHide(false);
+        mayoForwardProgressBulletin.show();
+        final Bulletin startedBulletin = mayoForwardProgressBulletin;
+        AndroidUtilities.runOnUIThread(() -> {
+            if (mayoForwardProgressBulletin == startedBulletin && startedBulletin != null) {
+                mayoStopForwardProgress();
+            }
+        }, 20000);
+    }
+
+    private void mayoOnForwardMessageDelivered(long dialogId) {
+        if (mayoForwardProgressDialogIds == null || !mayoForwardProgressDialogIds.contains(dialogId) || mayoForwardProgressLayout == null) {
+            return;
+        }
+        mayoForwardProgressSent = Math.min(mayoForwardProgressSent + 1, mayoForwardProgressTotal);
+        mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, mayoForwardProgressSent, mayoForwardProgressTotal), true);
+        mayoForwardProgressLayout.setProgress(mayoForwardProgressSent / (float) mayoForwardProgressTotal);
+        if (mayoForwardProgressSent >= mayoForwardProgressTotal) {
+            final Bulletin bulletin = mayoForwardProgressBulletin;
+            AndroidUtilities.runOnUIThread(() -> {
+                if (bulletin != null) {
+                    bulletin.setCanHide(true);
+                    bulletin.hide();
+                }
+            }, 500);
+            mayoForwardProgressBulletin = null;
+            mayoForwardProgressLayout = null;
+            mayoForwardProgressDialogIds = null;
+        }
+    }
+
+    private void mayoStopForwardProgress() {
+        if (mayoForwardProgressBulletin != null) {
+            mayoForwardProgressBulletin.setCanHide(true);
+            mayoForwardProgressBulletin.hide();
+        }
+        mayoForwardProgressBulletin = null;
+        mayoForwardProgressLayout = null;
+        mayoForwardProgressDialogIds = null;
+    }
+
     private void forwardMessages(ArrayList<MessageObject> arrayList, boolean fromMyName, boolean hideCaption, boolean notify, int scheduleDate, long payStars) {
         if (arrayList == null || arrayList.isEmpty()) {
             return;
@@ -14389,6 +14449,7 @@ public class ChatActivity extends BaseFragment implements
         }
         int result = 0;
         if (scheduleDate == 0 && !DialogObject.isEncryptedDialog(dialog_id)) {
+            mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
             for (int a = 0, N = arrayList.size(); a < N; a++) {
                 getSendMessagesHelper().processForwardFromMyName(arrayList.get(a), dialog_id, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
             }
@@ -22341,6 +22402,9 @@ public class ChatActivity extends BaseFragment implements
             ArrayList<Integer> markAsDeletedMessages = (ArrayList<Integer>) args[0];
             processDeletedMessages(markAsDeletedMessages, 0, false);
         } else if (id == NotificationCenter.messageReceivedByServer) {
+            if (mayoForwardProgressDialogIds != null && args[3] instanceof Long) {
+                mayoOnForwardMessageDelivered((Long) args[3]);
+            }
             Boolean scheduled = (Boolean) args[6];
             if (scheduled != (chatMode == MODE_SCHEDULED)) {
                 return;
@@ -34426,6 +34490,16 @@ public class ChatActivity extends BaseFragment implements
 
                 messagePreviewParams = null;
                 hideFieldPanel(false);
+                if (scheduleDate == 0) {
+                    java.util.ArrayList<Long> reuploadDialogIds = new java.util.ArrayList<>();
+                    for (int a = 0; a < dids.size(); a++) {
+                        long did = dids.get(a).dialogId;
+                        if (!DialogObject.isEncryptedDialog(did)) {
+                            reuploadDialogIds.add(did);
+                        }
+                    }
+                    mayoStartForwardProgress(reuploadDialogIds, reuploadDialogIds.size() * fmessages.size());
+                }
                 for (int a = 0; a < dids.size(); a++) {
                     final long did = dids.get(a).dialogId;
                     final Long price = prices == null ? (Long) 0L : prices.get(did);
