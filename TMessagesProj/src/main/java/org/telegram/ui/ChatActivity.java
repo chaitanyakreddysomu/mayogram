@@ -14387,7 +14387,19 @@ public class ChatActivity extends BaseFragment implements
                 chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
             }
         }
-        int result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+        ArrayList<MessageObject> regularMessages = arrayList;
+        if (scheduleDate == 0) {
+            regularMessages = new ArrayList<>();
+            for (int a = 0, N = arrayList.size(); a < N; a++) {
+                MessageObject messageObject = arrayList.get(a);
+                if (messageObject.isMusic() && (messageObject.attachPathExists || messageObject.mediaExists())) {
+                    getSendMessagesHelper().processForwardFromMyName(messageObject, dialog_id, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                } else {
+                    regularMessages.add(messageObject);
+                }
+            }
+        }
+        int result = regularMessages.isEmpty() ? 0 : getSendMessagesHelper().sendMessage(regularMessages, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
         AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
         if (result != 0) {
             AndroidUtilities.runOnUIThread(() -> {
@@ -34430,7 +34442,18 @@ public class ChatActivity extends BaseFragment implements
                         params.suggestionParams = messageSuggestionParams;
                         getSendMessagesHelper().sendMessage(params);
                     }
-                    getSendMessagesHelper().sendMessage(fmessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                    ArrayList<MessageObject> regularMessages = new ArrayList<>();
+                    for (int i = 0; i < fmessages.size(); i++) {
+                        MessageObject fmessageObject = fmessages.get(i);
+                        if (fmessageObject.isMusic() && (fmessageObject.attachPathExists || fmessageObject.mediaExists())) {
+                            getSendMessagesHelper().processForwardFromMyName(fmessageObject, did, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                        } else {
+                            regularMessages.add(fmessageObject);
+                        }
+                    }
+                    if (!regularMessages.isEmpty()) {
+                        getSendMessagesHelper().sendMessage(regularMessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                    }
                 }
                 fragment.finishFragment();
                 createUndoView();
@@ -46140,7 +46163,8 @@ public class ChatActivity extends BaseFragment implements
                     && !selectedObject.isWallpaperAction()
                     && !message.isExpiredStory()
                     && message.type != MessageObject.TYPE_STORY_MENTION
-                    && message.type != MessageObject.TYPE_GIFT_STARS;
+                    && message.type != MessageObject.TYPE_GIFT_STARS
+                    && (!selectedObject.isMusic() || selectedObject.attachPathExists || selectedObject.mediaExists());
                 if (canForward) {
                     items.add(LocaleController.getString(R.string.Forward));
                     options.add(OPTION_FORWARD);

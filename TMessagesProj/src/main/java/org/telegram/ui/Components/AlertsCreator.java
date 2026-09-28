@@ -289,7 +289,12 @@ public class AlertsCreator {
         if (error == null || error.code == 406 || error.text == null) {
             return null;
         }
-        if ("BALANCE_TOO_LOW".equalsIgnoreCase(error.text)) {
+        if ("CHAT_FORWARDS_RESTRICTED".equalsIgnoreCase(error.text)) {
+            if (fragment == null) {
+                fragment = LaunchActivity.getLastFragment();
+            }
+            BulletinFactory.of(fragment).createErrorBulletin(LocaleController.getString(R.string.ForwardsRestrictedInfoChannel)).show();
+        } else if ("BALANCE_TOO_LOW".equalsIgnoreCase(error.text)) {
             final long price = StarsController.getAllowedPaidStars(request);
             final long dialogId = StarsController.getPeer(request);
             if (price > 0) {
