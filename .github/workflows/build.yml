@@ -85,20 +85,13 @@ jobs:
             echo "ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}"
           } >> "$GITHUB_ENV"
 
-      - name: Build release APK and AAB
+      - name: Build release APK
         run: |
           ./gradlew \
-            :TMessagesProj_App:assembleAfatRelease \
-            :TMessagesProj_App:bundleBundleAfatRelease --stacktrace
+            :TMessagesProj_App:assembleAfatRelease --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: mayogram-release-apk
           path: TMessagesProj_App/build/outputs/apk/afat/release/*.apk
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mayogram-release-aab
-          path: TMessagesProj_App/build/outputs/bundle/**/*.aab
           if-no-files-found: error
