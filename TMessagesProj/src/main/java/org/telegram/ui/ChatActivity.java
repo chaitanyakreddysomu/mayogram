@@ -14387,19 +14387,14 @@ public class ChatActivity extends BaseFragment implements
                 chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
             }
         }
-        ArrayList<MessageObject> regularMessages = arrayList;
-        if (scheduleDate == 0) {
-            regularMessages = new ArrayList<>();
+        int result = 0;
+        if (scheduleDate == 0 && !DialogObject.isEncryptedDialog(dialog_id)) {
             for (int a = 0, N = arrayList.size(); a < N; a++) {
-                MessageObject messageObject = arrayList.get(a);
-                if (messageObject.isMusic() && (messageObject.attachPathExists || messageObject.mediaExists())) {
-                    getSendMessagesHelper().processForwardFromMyName(messageObject, dialog_id, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-                } else {
-                    regularMessages.add(messageObject);
-                }
+                getSendMessagesHelper().processForwardFromMyName(arrayList.get(a), dialog_id, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
             }
+        } else {
+            result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
         }
-        int result = regularMessages.isEmpty() ? 0 : getSendMessagesHelper().sendMessage(regularMessages, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
         AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
         if (result != 0) {
             AndroidUtilities.runOnUIThread(() -> {
@@ -34442,17 +34437,12 @@ public class ChatActivity extends BaseFragment implements
                         params.suggestionParams = messageSuggestionParams;
                         getSendMessagesHelper().sendMessage(params);
                     }
-                    ArrayList<MessageObject> regularMessages = new ArrayList<>();
-                    for (int i = 0; i < fmessages.size(); i++) {
-                        MessageObject fmessageObject = fmessages.get(i);
-                        if (fmessageObject.isMusic() && (fmessageObject.attachPathExists || fmessageObject.mediaExists())) {
-                            getSendMessagesHelper().processForwardFromMyName(fmessageObject, did, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-                        } else {
-                            regularMessages.add(fmessageObject);
+                    if (scheduleDate == 0 && !DialogObject.isEncryptedDialog(did)) {
+                        for (int i = 0; i < fmessages.size(); i++) {
+                            getSendMessagesHelper().processForwardFromMyName(fmessages.get(i), did, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
                         }
-                    }
-                    if (!regularMessages.isEmpty()) {
-                        getSendMessagesHelper().sendMessage(regularMessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+                    } else {
+                        getSendMessagesHelper().sendMessage(fmessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
                     }
                 }
                 fragment.finishFragment();

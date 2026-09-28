@@ -333,7 +333,7 @@ public class AccessCodeActivity extends BaseFragment {
             if (result == AccessCodeController.RESULT_OK) {
                 setAllBorders(COLOR_GREEN);
                 // Small delay so the user can see the green state.
-                AndroidUtilities.runOnUIThread(() -> presentFragment(new IntroActivity(), true), 300);
+                AndroidUtilities.runOnUIThread(() -> presentFragment(new LoginActivity(), true), 300);
                 return;
             }
 
