@@ -2504,7 +2504,14 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
                         params.monoForumPeer = monoForumPeerId;
                         SendMessagesHelper.getInstance(currentAccount).sendMessage(params);
                     }
-                    result = SendMessagesHelper.getInstance(currentAccount).sendMessage(sendingMessageObjects, key, !showSendersName,false, withSound, 0, 0, replyTopMsg, video_timestamp, price == null ? 0 : price, monoForumPeerId, null);
+                    if (replyTopMsg == null && !DialogObject.isEncryptedDialog(key) && sendingMessageObjects != null) {
+                        for (int b = 0; b < sendingMessageObjects.size(); b++) {
+                            SendMessagesHelper.getInstance(currentAccount).processForwardFromMyName(sendingMessageObjects.get(b), key, price == null ? 0 : price, monoForumPeerId, null);
+                        }
+                        result = 0;
+                    } else {
+                        result = SendMessagesHelper.getInstance(currentAccount).sendMessage(sendingMessageObjects, key, !showSendersName,false, withSound, 0, 0, replyTopMsg, video_timestamp, price == null ? 0 : price, monoForumPeerId, null);
+                    }
                     if (result != 0) {
                         removeKeys.add(key);
                     }

@@ -14563,6 +14563,9 @@ public class MessagesController extends BaseController implements NotificationCe
                 request.max_id = task.maxId;
                 req = request;
             } else if (inputPeer instanceof TLRPC.TL_inputPeerChannel) {
+                if (GhostModeController.isEnabled(currentAccount)) {
+                    return;
+                }
                 TLRPC.TL_channels_readHistory request = new TLRPC.TL_channels_readHistory();
                 request.channel = getInputChannel(-task.dialogId);
                 request.max_id = task.maxId;

@@ -8350,6 +8350,9 @@ public class MessageObject {
         if (isRepostPreview) {
             return false;
         }
+        if (isMusic() && !attachPathExists && !mediaExists()) {
+            return false;
+        }
         if (sideMenuEnabled) {
             return false;
         }
