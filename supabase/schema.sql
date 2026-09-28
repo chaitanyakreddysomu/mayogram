@@ -109,3 +109,41 @@ $$;
 -- The app (anon key) may call the function, but still cannot read the table.
 revoke all on function public.redeem_access_code(text, text, text) from public;
 grant execute on function public.redeem_access_code(text, text, text) to anon, authenticated;
+
+
+-- ---------------------------------------------------------------------------
+-- Link the Telegram account to the redeemed row
+-- ---------------------------------------------------------------------------
+-- Called once, right after the Telegram login itself succeeds (a separate
+-- step from redeem_access_code, since the Telegram user id/username are not
+-- known yet at redemption time - only the installation_id is). Updates the
+-- most recently redeemed row for this installation; harmless no-op if the
+-- installation_id is unknown (e.g. gate disabled builds never call this).
+
+create or replace function public.link_telegram_account(
+    p_installation_id text,
+    p_telegram_user_id bigint,
+    p_telegram_username text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    update public.telegram_requests
+       set telegram_user_id   = p_telegram_user_id,
+           telegram_username  = p_telegram_username,
+           last_seen_at       = now()
+     where installation_id = p_installation_id
+       and id = (
+           select id from public.telegram_requests
+            where installation_id = p_installation_id
+            order by used_at desc nulls last
+            limit 1
+       );
+end;
+$$;
+
+revoke all on function public.link_telegram_account(text, bigint, text) from public;
+grant execute on function public.link_telegram_account(text, bigint, text) to anon, authenticated;

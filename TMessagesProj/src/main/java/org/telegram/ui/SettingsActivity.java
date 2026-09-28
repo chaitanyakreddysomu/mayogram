@@ -97,6 +97,7 @@ import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.SettingsSearchCell;
+import org.telegram.ui.Cells.TextCell;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AvatarDrawable;
@@ -785,9 +786,35 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
+    private boolean channelsCounterRefreshing;
+
     private void onClick(UItem item, View view, int position, float x, float y) {
         if (item.id == MAYO_CHANNELS_COUNTER_ID) {
-            listView.adapter.update(true);
+            if (channelsCounterRefreshing) {
+                return;
+            }
+            channelsCounterRefreshing = true;
+            ObjectAnimator spin = null;
+            if (view instanceof TextCell) {
+                ImageView icon = ((TextCell) view).imageView;
+                icon.setPivotX(icon.getWidth() / 2f);
+                icon.setPivotY(icon.getHeight() / 2f);
+                spin = ObjectAnimator.ofFloat(icon, View.ROTATION, 0f, 360f);
+                spin.setDuration(1000);
+                spin.setRepeatCount(ObjectAnimator.INFINITE);
+                spin.setInterpolator(new android.view.animation.LinearInterpolator());
+                spin.start();
+            }
+            final ObjectAnimator spinAnimator = spin;
+            AndroidUtilities.runOnUIThread(() -> {
+                channelsCounterRefreshing = false;
+                if (spinAnimator != null) {
+                    spinAnimator.cancel();
+                }
+                if (listView != null && listView.adapter != null) {
+                    listView.adapter.update(true);
+                }
+            }, 1000);
             return;
         }
         if (item.object instanceof TLRPC.TL_attachMenuBot) {

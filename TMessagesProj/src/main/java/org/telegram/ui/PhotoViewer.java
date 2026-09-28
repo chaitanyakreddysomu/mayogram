@@ -4949,6 +4949,20 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                                 ext = ext.toLowerCase();
                             }
                             isVideo = ext != null && (ext.equals("webm") || ext.equals("mp4") || ext.equals("gif"));
+                        } else if (currentFileLocation != null) {
+                            // Still (non-video) profile/channel avatar photo:
+                            // currentMessageObject is null in this mode (see
+                            // onPhotoShow) and currentFileLocationVideo only
+                            // gets populated for animated avatars, so without
+                            // this branch f stayed null and Save to Gallery
+                            // fell through to showDownloadAlert() instead of
+                            // actually saving the avatar.
+                            String ext = getFileLocationExt(currentFileLocation);
+                            f = FileLoader.getInstance(currentAccount).getPathToAttach(getFileLocation(currentFileLocation), ext, avatarsDialogId != 0 || isEvent);
+                            if (f != null && !f.exists()) {
+                                f = FileLoader.getInstance(currentAccount).getPathToAttach(getFileLocation(currentFileLocation), ext, false);
+                            }
+                            isVideo = false;
                         } else if (pageBlocksAdapter != null) {
                             f = pageBlocksAdapter.getFile(currentIndex);
                             isVideo = pageBlocksAdapter.isVideo(currentIndex);
@@ -17436,13 +17450,14 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 avatarsDialogId != 0 && MessagesController.getInstance(currentAccount).isPeerNoForwards(avatarsDialogId) ||
                 messageObject != null && (MessagesController.getInstance(currentAccount).isPeerNoForwards(messageObject.getDialogId()) ||
                 (messageObject.messageOwner != null && messageObject.messageOwner.noforwards)) || messageObject != null && messageObject.hasRevealedExtendedMedia()
-            ) {
-                windowLayoutParams.flags |= WindowManager.LayoutParams.FLAG_SECURE;
-                AndroidUtilities.logFlagSecure();
-            } else {
-                windowLayoutParams.flags &=~ WindowManager.LayoutParams.FLAG_SECURE;
-                AndroidUtilities.logFlagSecure();
-            }
+            ) 
+            // {
+            //     windowLayoutParams.flags |= WindowManager.LayoutParams.FLAG_SECURE;
+            //     AndroidUtilities.logFlagSecure();
+            // } else {
+            //     windowLayoutParams.flags &=~ WindowManager.LayoutParams.FLAG_SECURE;
+            //     AndroidUtilities.logFlagSecure();
+            // }
             windowLayoutParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION;
             windowView.setFocusable(false);
             containerView.setFocusable(false);

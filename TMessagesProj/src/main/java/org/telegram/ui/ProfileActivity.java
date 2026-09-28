@@ -4043,7 +4043,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         } else {
             editItem = menu.addItem(edit_channel, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString(R.string.Edit));
-            if (chatId != 0 && currentChat != null && !isTopic) {
+            if (chatId != 0 && currentChat != null && !isTopic && ChatObject.canAddUsers(currentChat)) {
                 ActionBarMenuItem inviteLinksItem = menu.addItem(invite_links_shortcut, R.drawable.msg_link);
                 inviteLinksItem.setContentDescription(LocaleController.getString(R.string.InviteLink));
             }

@@ -24,6 +24,10 @@
     <string name="DownloadManagerStatusFailed">Failed</string>
     <string name="DownloadManagerShareFileMissing">The downloaded file is no longer available locally. Try downloading it again.</string>
     <string name="ChannelAppearanceMenuItem">Channel Appearance (local)</string>
+    <string name="GoToTopMenuItem">Go to Top</string>
+    <string name="GhostModeMenuItem">Ghost Mode</string>
+    <string name="GhostModeTitle">Ghost</string>
+    <string name="GhostModeError">Couldn\'t change Ghost Mode. Check your connection and try again.</string>
     <string name="ChannelAppearanceTitle">Channel Appearance</string>
     <string name="ChannelAppearanceLocalNotice">These changes are visible only on this device, for you. They are not sent to Telegram and no one else in this chat will see them.</string>
     <string name="ChannelAppearanceColorSection">CHANNEL NAME COLOR</string>
@@ -3324,6 +3328,8 @@
     <string name="SpeedNormal">Normal</string>
     <string name="SpeedMedium">Medium</string>
     <string name="SpeedSuperFast">Super Fast</string>
+    <string name="SpeedVerySuperFast">Very Super Fast</string>
+    <string name="SpeedRabbit">Rabbit</string>
     <string name="VideoSpeedVeryFast">Very fast</string>
     <string name="VideoSpeedFast">Fast</string>
     <string name="VideoSpeedCustom">Custom %s</string>

@@ -1687,6 +1687,7 @@ public class ChatActivity extends BaseFragment implements
 
     private final static int chat_menu_topic_create = 73;
     private final static int channel_appearance = 74;
+    private final static int go_to_top = 75;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -4024,6 +4025,12 @@ public class ChatActivity extends BaseFragment implements
                     showChatThemeBottomSheet();
                 } else if (id == channel_appearance) {
                     presentFragment(new org.telegram.messenger.appearance.ChannelAppearanceActivity(getDialogId()));
+                } else if (id == go_to_top) {
+                    // Reuses the same server-backed jump-to-date search the
+                    // built-in calendar "Jump to date" feature uses; passing a
+                    // date older than any real message lands on the very first
+                    // message in the chat's history.
+                    jumpToDate(1);
                 } else if (id == topic_close) {
                     if (forumTopic == null)
                         return;
@@ -4445,6 +4452,8 @@ public class ChatActivity extends BaseFragment implements
             if (ChatObject.isChannel(currentChat)) {
                 headerItem.lazilyAddSubItem(channel_appearance, R.drawable.msg_palette,
                         LocaleController.getString(R.string.ChannelAppearanceMenuItem));
+                headerItem.lazilyAddSubItem(go_to_top, R.drawable.msg_go_up,
+                        LocaleController.getString(R.string.GoToTopMenuItem));
             }
             boolean addedSettings = false;
             if (!isTopic) {

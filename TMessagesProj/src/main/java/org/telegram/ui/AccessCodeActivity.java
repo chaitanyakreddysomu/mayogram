@@ -24,18 +24,17 @@ import org.telegram.messenger.AccessCodeController;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
-import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.EditTextBoldCursor;
+import org.telegram.ui.Components.FragmentFloatingButton;
 import org.telegram.ui.Components.LayoutHelper;
 
 public class AccessCodeActivity extends BaseFragment {
 
     private EditTextBoldCursor codeField;
     private TextView errorTextView;
-    private TextView continueButton;
-    private AlertDialog progressDialog;
+    private FragmentFloatingButton floatingButton;
     private boolean redeeming;
 
     @Override
@@ -102,24 +101,19 @@ public class AccessCodeActivity extends BaseFragment {
         root.addView(errorTextView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,
                 LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 0, 0, 12));
 
-        continueButton = new TextView(context);
-        continueButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        continueButton.setTypeface(AndroidUtilities.bold());
-        continueButton.setGravity(Gravity.CENTER);
-        continueButton.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-        continueButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(
-                AndroidUtilities.dp(8),
-                Theme.getColor(Theme.key_featuredStickers_addButton),
-                Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
-        continueButton.setText(LocaleController.getString(R.string.AccessCodeContinue));
-        continueButton.setOnClickListener(v -> submit());
-        root.addView(continueButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT,
-                AndroidUtilities.dp(48), Gravity.CENTER_HORIZONTAL, 0, 8, 0, 0));
-
         FrameLayout container = new FrameLayout(context);
         container.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         container.addView(root, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT,
                 LayoutHelper.WRAP_CONTENT, Gravity.TOP));
+
+        // Telegram's own small round FAB (same one PasscodeActivity/LoginActivity
+        // use for "Next"/"Done") rather than a distinct full-width button.
+        floatingButton = new FragmentFloatingButton(context, getResourceProvider());
+        floatingButton.setImageResource(R.drawable.floating_check);
+        floatingButton.setContentDescription(LocaleController.getString(R.string.AccessCodeContinue));
+        floatingButton.setOnClickListener(v -> submit());
+        container.addView(floatingButton, FragmentFloatingButton.createDefaultLayoutParamsBig());
+
         fragmentView = container;
         return fragmentView;
     }
@@ -143,16 +137,11 @@ public class AccessCodeActivity extends BaseFragment {
 
         redeeming = true;
         AndroidUtilities.hideKeyboard(codeField);
-        progressDialog = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
-        progressDialog.setCanCancel(false);
-        progressDialog.show();
+        floatingButton.setProgressVisible(true, true);
 
         AccessCodeController.redeem(code, result -> {
             redeeming = false;
-            if (progressDialog != null) {
-                progressDialog.dismiss();
-                progressDialog = null;
-            }
+            floatingButton.setProgressVisible(false, true);
             if (result == AccessCodeController.RESULT_OK) {
                 // Authorised: hand over to Telegram's own login flow.
                 presentFragment(new IntroActivity(), true);

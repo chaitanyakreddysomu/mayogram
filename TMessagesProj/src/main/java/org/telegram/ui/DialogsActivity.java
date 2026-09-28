@@ -3514,8 +3514,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo_2).mutate();
                 logoDrawable.setBounds(0, dp(2), logoDrawable.getIntrinsicWidth(), dp(2) + logoDrawable.getIntrinsicHeight());
                 logoDrawable.setColorFilter(getThemedColor(Theme.key_telegram_color_dialogsLogo), PorterDuff.Mode.MULTIPLY);
-                SpannableStringBuilder ssb = new SpannableStringBuilder(getString(R.string.AppName));
-                ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                SpannableStringBuilder ssb = new SpannableStringBuilder(getHomeTitleText());
                 actionBar.setTitle(ssb, statusDrawable);
                 updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
             }
@@ -13624,6 +13623,26 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    private String getHomeTitleText() {
+        if (org.telegram.messenger.GhostModeController.isEnabled(currentAccount)) {
+            return getString(R.string.GhostModeTitle);
+        }
+        TLRPC.User homeTitleUser = UserConfig.getInstance(currentAccount).getCurrentUser();
+        String homeTitleName = homeTitleUser != null
+                ? ContactsController.formatName(homeTitleUser.first_name, homeTitleUser.last_name)
+                : getString(R.string.AppName);
+        if (TextUtils.isEmpty(homeTitleName)) {
+            homeTitleName = getString(R.string.AppName);
+        }
+        return homeTitleName;
+    }
+
+    private void updateGhostModeTitle() {
+        if (actionBar != null && folderId == 0 && communityId == 0) {
+            actionBar.setTitle(new SpannableStringBuilder(getHomeTitleText()), statusDrawable);
+        }
+    }
+
     private void showItemOptions() {
         ItemOptions io = ItemOptions.makeOptions(this, optionsItem);
         io.setColors(getThemedColor(Theme.key_actionBarDefaultTitle), getThemedColor(Theme.key_actionBarDefaultTitle));
@@ -13715,6 +13734,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             switchTheme(themeInfo, toDark);
             Theme.turnOffAutoNight(BulletinFactory.of(this), () -> {
                 presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT));
+            });
+        });
+        io.addChecked(org.telegram.messenger.GhostModeController.isEnabled(currentAccount), R.drawable.ghost,
+                getString(R.string.GhostModeMenuItem), () -> {
+            boolean newValue = !org.telegram.messenger.GhostModeController.isEnabled(currentAccount);
+            org.telegram.messenger.GhostModeController.setEnabled(currentAccount, newValue, success -> {
+                if (!success) {
+                    BulletinFactory.of(this).createErrorBulletin(getString(R.string.GhostModeError)).show();
+                }
+                updateGhostModeTitle();
             });
         });
         io.addGap();

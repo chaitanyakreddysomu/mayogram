@@ -188,6 +188,49 @@ public class AccessCodeController {
         }
     }
 
+    /**
+     * Best-effort: links the now-known Telegram account to this installation's
+     * redeemed row, so the admin token list shows who redeemed each code.
+     * Fire-and-forget - login must never be blocked or failed by this.
+     */
+    public static void linkTelegramAccount(final long telegramUserId, final String telegramUsername) {
+        if (!isGateConfigured()) {
+            return;
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(BuildConfig.SUPABASE_URL + "/rest/v1/rpc/link_telegram_account");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(15000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY);
+                connection.setRequestProperty("Authorization", "Bearer " + BuildConfig.SUPABASE_ANON_KEY);
+
+                JSONObject body = new JSONObject();
+                body.put("p_installation_id", getInstallationId());
+                body.put("p_telegram_user_id", telegramUserId);
+                body.put("p_telegram_username", telegramUsername != null ? telegramUsername : "");
+
+                OutputStream out = connection.getOutputStream();
+                out.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                out.close();
+
+                connection.getResponseCode();
+            } catch (Exception e) {
+                FileLog.e(e);
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+    }
+
     private static String getDeviceDescription() {
         return android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
                 + " (SDK " + android.os.Build.VERSION.SDK_INT + ")";
