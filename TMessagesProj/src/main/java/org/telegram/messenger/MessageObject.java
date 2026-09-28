@@ -8384,8 +8384,6 @@ public class MessageObject {
             return false;
         } else if (searchType == ChatActivity.SEARCH_PUBLIC_POSTS) {
             return true;
-        } else if (messageOwner.noforwards) {
-            return false;
         } else if (messageOwner.fwd_from != null && !isOutOwner() && messageOwner.fwd_from.saved_from_peer != null && getDialogId() == UserConfig.getInstance(currentAccount).getClientUserId()) {
             return true;
         } else if (type == TYPE_STICKER || type == TYPE_ANIMATED_STICKER || type == TYPE_EMOJIS) {
@@ -8655,11 +8653,7 @@ public class MessageObject {
             return;
         }
         boolean hasUrls = applyEntities();
-        boolean noforwards = messageOwner != null && messageOwner.noforwards;
-        if (!noforwards) {
-            final long dialogId = getDialogId();
-            noforwards = MessagesController.getInstance(currentAccount).isPeerNoForwards(dialogId);
-        }
+        boolean noforwards = false;
 
         textLayoutBlocks = new ArrayList<>();
         textWidth = 0;
@@ -9151,11 +9145,7 @@ public class MessageObject {
         public TextLayoutBlocks(MessageObject messageObject, @NonNull CharSequence text, TextPaint textPaint, int width) {
             this.text = text;
             textWidth = 0;
-            boolean noforwards = messageObject != null && messageObject.messageOwner != null && messageObject.messageOwner.noforwards;
-            if (messageObject != null && !noforwards) {
-                final long dialogId = messageObject.getDialogId();
-                noforwards = MessagesController.getInstance(messageObject.currentAccount).isPeerNoForwards(dialogId);
-            }
+            boolean noforwards = false;
 
             hasCode = text instanceof Spanned && ((Spanned) text).getSpans(0, text.length(), CodeHighlighting.Span.class).length > 0;
             hasQuote = text instanceof Spanned && ((Spanned) text).getSpans(0, text.length(), QuoteSpan.QuoteStyleSpan.class).length > 0;
@@ -10343,9 +10333,17 @@ public class MessageObject {
             }
             if (!TextUtils.isEmpty(document.mime_type)) {
                 String mime = document.mime_type.toLowerCase();
-                if (mime.equals("audio/flac") || mime.equals("audio/ogg") || mime.equals("audio/opus") || mime.equals("audio/x-opus+ogg")) {
+                if (mime.startsWith("audio/")) {
                     return true;
                 } else if (mime.equals("application/octet-stream") && FileLoader.getDocumentFileName(document).endsWith(".opus")) {
+                    return true;
+                }
+            }
+            String fileName = FileLoader.getDocumentFileName(document);
+            if (!TextUtils.isEmpty(fileName)) {
+                String lower = fileName.toLowerCase();
+                if (lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".flac") || lower.endsWith(".wav") ||
+                    lower.endsWith(".ogg") || lower.endsWith(".opus") || lower.endsWith(".aac") || lower.endsWith(".wma")) {
                     return true;
                 }
             }
@@ -11598,7 +11596,7 @@ public class MessageObject {
     public boolean canForwardMessage() {
         if (isQuickReply()) return false;
         if (type == TYPE_GIFT_STARS || type == TYPE_GIFT_THEME_UPDATE || type == TYPE_SUGGEST_BIRTHDAY || type == TYPE_GIFT_OFFER || type == TYPE_SHARING_OFFER || type == TYPE_COMMUNITY_CHANGED) return false;
-        return !(messageOwner instanceof TLRPC.TL_message_secret) && !needDrawBluredPreview() && !isLiveLocation() && type != MessageObject.TYPE_PHONE_CALL && !isSponsored() && !messageOwner.noforwards;
+        return !(messageOwner instanceof TLRPC.TL_message_secret) && !needDrawBluredPreview() && !isLiveLocation() && type != MessageObject.TYPE_PHONE_CALL && !isSponsored();
     }
 
     public boolean canEditMedia() {

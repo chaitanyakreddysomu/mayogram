@@ -85,20 +85,11 @@ jobs:
             echo "ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}"
           } >> "$GITHUB_ENV"
 
-      - name: Build debug APK
-        run: ./gradlew :TMessagesProj_App:assembleAfatDebug --stacktrace
-
       - name: Build release APK and AAB
         run: |
           ./gradlew \
             :TMessagesProj_App:assembleAfatRelease \
             :TMessagesProj_App:bundleBundleAfatRelease --stacktrace
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mayogram-debug-apk
-          path: TMessagesProj_App/build/outputs/apk/afat/debug/*.apk
-          if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:
