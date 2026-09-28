@@ -34498,7 +34498,8 @@ public class ChatActivity extends BaseFragment implements
                             reuploadDialogIds.add(did);
                         }
                     }
-                    mayoStartForwardProgress(reuploadDialogIds, reuploadDialogIds.size() * fmessages.size());
+                    int itemsPerDialog = fmessages.size() + (TextUtils.isEmpty(message) ? 0 : 1);
+                    mayoStartForwardProgress(reuploadDialogIds, reuploadDialogIds.size() * itemsPerDialog);
                 }
                 for (int a = 0; a < dids.size(); a++) {
                     final long did = dids.get(a).dialogId;
