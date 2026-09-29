@@ -12247,7 +12247,8 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private void openForward(boolean fromActionBar) {
-        if ((isPeerNoForwards() && !isOwnerOfCurrentChat()) || hasSelectedNoforwardsMessage()) {
+        // if ((isPeerNoForwards() && !isOwnerOfCurrentChat()) || hasSelectedNoforwardsMessage()) {
+        if ((isPeerNoForwards())) {
             // We should update text if user changed locale without re-opening chat activity
             String str;
             if (isPeerNoForwards()) {

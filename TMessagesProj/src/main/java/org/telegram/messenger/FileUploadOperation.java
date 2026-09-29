@@ -37,12 +37,12 @@ public class FileUploadOperation {
     private boolean isLastPart;
     private boolean nextPartFirst;
     private int operationGuid;
-    private static final int minUploadChunkSize = 128;
-    private static final int minUploadChunkSlowNetworkSize = 32;
-    private static final int initialRequestsCount = 8;
-    private static final int initialRequestsSlowNetworkCount = 1;
-    private static final int maxUploadingKBytes = 1024 * 2;
-    private static final int maxUploadingSlowNetworkKBytes = 32;
+    private static final int minUploadChunkSize = 512;              // was 128 → 512 KB chunks (Telegram's maximum)
+    private static final int minUploadChunkSlowNetworkSize = 32;    // unchanged
+    private static final int initialRequestsCount = 8;              // unchanged, see note below
+    private static final int initialRequestsSlowNetworkCount = 1;   // unchanged
+    private static final int maxUploadingKBytes = 1024 * 4;         // was 1024 * 2 → 4 MB in flight per file
+    private static final int maxUploadingSlowNetworkKBytes = 32;    // unchanged
 
     private int maxRequestsCount;
     private int uploadChunkSize = 64 * 1024;
