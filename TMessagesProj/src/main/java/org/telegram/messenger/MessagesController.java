@@ -6699,7 +6699,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isChatNoForwards(TLRPC.Chat chat) {
-        return false;
+        return chat != null && chat.noforwards;
     }
 
     public boolean isChatNoForwards(long chatId) {
@@ -6715,7 +6715,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isUserNoForwards(TLRPC.UserFull userFull) {
-        return false;
+        return userFull != null && userFull.noforwards_peer_enabled;
     }
 
     public TLRPC.User getUser(Long id) {

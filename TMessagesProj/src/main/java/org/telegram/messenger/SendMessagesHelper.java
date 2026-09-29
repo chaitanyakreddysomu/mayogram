@@ -151,6 +151,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
     private final HashMap<String, ImportingStickers> importingStickersFiles = new HashMap<>();
     private final HashMap<String, ImportingStickers> importingStickersMap = new HashMap<>();
+    /** Strong refs for in-flight forward-reupload download listeners; DownloadController only keeps a WeakReference. */
+    private final HashMap<String, DownloadController.FileDownloadProgressListener> forwardReuploadListeners = new HashMap<>();
 
     public static boolean checkUpdateStickersOrder(CharSequence text) {
         if (text instanceof Spannable) {
@@ -1784,6 +1786,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 params.put("parentObject", "sent_" + messageObject.messageOwner.peer_id.channel_id + "_" + messageObject.getId() + "_" + messageObject.getDialogId() + "_" + messageObject.type + "_" + messageObject.getSize());
             }
             if (messageObject.messageOwner.media.photo instanceof TLRPC.TL_photo) {
+                if (!DialogObject.isEncryptedDialog(did)
+                        && messageObject.messageOwner.media.ttl_seconds == 0
+                        && !isForwardOfMediaRestricted(messageObject)
+                        && tryForwardPhotoAsNewUpload(messageObject, did, payStars, monoForumPeerId, suggestionParams)) {
+                    return;
+                }
                 SendMessagesHelper.SendMessageParams fparams = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_photo) messageObject.messageOwner.media.photo, null, did, messageObject.replyMessageObject, null, messageObject.messageOwner.message, messageObject.messageOwner.entities, null, params, true, 0, 0, messageObject.messageOwner.media.ttl_seconds, messageObject, false);
                 fparams.payStars = payStars;
                 fparams.monoForumPeer = monoForumPeerId;
@@ -1850,6 +1858,108 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             arrayList.add(messageObject);
             sendMessage(arrayList, did, true, false, true, 0, 0, null, -1, payStars, monoForumPeerId, suggestionParams);
         }
+    }
+
+    /**
+     * True if the source message/chat marks this media as forward/save restricted. Callers must
+     * treat this as a hard stop for any path that copies file bytes (cache re-upload); it does not
+     * gate the existing reference-based forward, which the server enforces restrictions on independently.
+     */
+    private boolean isForwardOfMediaRestricted(MessageObject messageObject) {
+        if (messageObject == null || messageObject.messageOwner == null) {
+            return true;
+        }
+        if (messageObject.messageOwner.noforwards) {
+            return true;
+        }
+        return getMessagesController().isPeerNoForwards(messageObject.getDialogId());
+    }
+
+    /**
+     * Forwards an allowed photo by re-uploading it as a brand-new photo (no "Forwarded from" header,
+     * no reused photo.id/access_hash/file_reference) instead of the normal reference-based forward.
+     * Uses the already-cached file when Telegram's own FileLoader cache already has it complete;
+     * otherwise downloads it first through the normal FileLoader mechanism.
+     *
+     * Returns false if this path can't be used (missing size info) so the caller can fall back to
+     * the existing reference-based forward; returns true once it has taken over sending the message
+     * (synchronously from cache, or asynchronously after a download).
+     */
+    private boolean tryForwardPhotoAsNewUpload(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        final TLRPC.TL_photo srcPhoto = (TLRPC.TL_photo) messageObject.messageOwner.media.photo;
+        final TLRPC.PhotoSize largest = FileLoader.getClosestPhotoSizeWithSize(srcPhoto.sizes, Integer.MAX_VALUE);
+        if (largest == null || largest.location == null || largest instanceof TLRPC.TL_photoSizeEmpty) {
+            return false;
+        }
+        final String caption = messageObject.messageOwner.message;
+        final ArrayList<TLRPC.MessageEntity> entities = messageObject.messageOwner.entities;
+        final long monoForumPeer = monoForumPeerId;
+        final MessageSuggestionParams sp = suggestionParams;
+
+        File cached = getFileLoader().getPathToAttach(largest, true);
+        if (cached != null && cached.exists() && cached.length() == largest.size) {
+            sendReuploadedPhoto(cached, did, caption, entities, monoForumPeer, sp);
+            return true;
+        }
+
+        final String fileName = FileLoader.getAttachFileName(largest);
+        DownloadController.FileDownloadProgressListener listener = new DownloadController.FileDownloadProgressListener() {
+            private final int tag = getDownloadController().generateObserverTag();
+
+            @Override
+            public void onFailedDownload(String name, boolean canceled) {
+                forwardReuploadListeners.remove(fileName);
+                getDownloadController().removeLoadingFileObserver(this);
+                if (!canceled) {
+                    fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
+                }
+            }
+
+            @Override
+            public void onSuccessDownload(String name) {
+                forwardReuploadListeners.remove(fileName);
+                getDownloadController().removeLoadingFileObserver(this);
+                File file = getFileLoader().getPathToAttach(largest, true);
+                if (file != null && file.exists() && file.length() == largest.size) {
+                    sendReuploadedPhoto(file, did, caption, entities, monoForumPeer, sp);
+                } else {
+                    // Never treat a partial/missing file as a complete photo.
+                    fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
+                }
+            }
+
+            @Override
+            public void onProgressDownload(String name, long downloadedSize, long totalSize) {
+            }
+
+            @Override
+            public void onProgressUpload(String name, long downloadedSize, long totalSize, boolean isEncrypted) {
+            }
+
+            @Override
+            public int getObserverTag() {
+                return tag;
+            }
+        };
+        forwardReuploadListeners.put(fileName, listener);
+        getDownloadController().addLoadingFileObserver(fileName, messageObject, listener);
+        getFileLoader().loadFile(ImageLocation.getForObject(largest, srcPhoto), messageObject, "jpg", FileLoader.PRIORITY_HIGH, 0);
+        return true;
+    }
+
+    private void fallbackToReferenceForward(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        SendMessagesHelper.SendMessageParams fparams = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_photo) messageObject.messageOwner.media.photo, null, did, messageObject.replyMessageObject, null, messageObject.messageOwner.message, messageObject.messageOwner.entities, null, null, true, 0, 0, messageObject.messageOwner.media.ttl_seconds, messageObject, false);
+        fparams.payStars = payStars;
+        fparams.monoForumPeer = monoForumPeerId;
+        fparams.suggestionParams = suggestionParams;
+        sendMessage(fparams);
+    }
+
+    private void sendReuploadedPhoto(File file, long did, String caption, ArrayList<TLRPC.MessageEntity> entities, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        AccountInstance accountInstance = AccountInstance.getInstance(currentAccount);
+        prepareSendingPhoto(accountInstance, file.getAbsolutePath(), null, (Uri) null, did,
+                null, null, null, null, entities, null, null, 0, null, null, true, 0, 0, 0,
+                false, caption, SendMessageChatArguments.EMPTY, 0, 0, monoForumPeerId, suggestionParams);
     }
 
     public void sendScreenshotMessage(TLRPC.User user, int messageId, TLRPC.Message resendMessage) {
