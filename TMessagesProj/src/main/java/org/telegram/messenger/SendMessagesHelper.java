@@ -1885,9 +1885,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (messageObject == null || messageObject.messageOwner == null) {
             return true;
         }
-        if (messageObject.messageOwner.noforwards) {
-            return true;
-        }
+        // if (messageObject.messageOwner.noforwards) {
+        //     return true;
+        // }
         return getMessagesController().isPeerNoForwards(messageObject.getDialogId());
     }
 
