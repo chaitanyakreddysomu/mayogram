@@ -12245,7 +12245,7 @@ public class ChatActivity extends BaseFragment implements
     private boolean isOwnerOfCurrentChat() {
         return currentChat != null && currentChat.creator;
     }
-
+    // boolean fromActionBar = true;
     private void openForward(boolean fromActionBar) {
         // if ((isPeerNoForwards() && !isOwnerOfCurrentChat()) || hasSelectedNoforwardsMessage()) {
         if ((isPeerNoForwards())) {
@@ -46991,9 +46991,11 @@ public class ChatActivity extends BaseFragment implements
     }
 
     public boolean isPeerNoForwards() {
-        return currentChat != null ?
-            getMessagesController().isChatNoForwards(currentChat) :
-            getMessagesController().isUserNoForwards(userInfo);
+        // return currentChat != null ?
+        //     getMessagesController().isChatNoForwards(currentChat) :
+        //     getMessagesController().isUserNoForwards(userInfo);
+
+        return false;
     }
 
     private PollAddOptionFieldLayout pollAddOptionFieldLayout;
