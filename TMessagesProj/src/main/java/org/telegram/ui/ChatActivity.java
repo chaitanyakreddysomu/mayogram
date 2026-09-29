@@ -12241,8 +12241,13 @@ public class ChatActivity extends BaseFragment implements
         updateSelectedMessageReactions();
     }
 
+    // Mayogram: the owner of a restricted channel/group may forward (re-uploaded from local files).
+    private boolean isOwnerOfCurrentChat() {
+        return currentChat != null && currentChat.creator;
+    }
+
     private void openForward(boolean fromActionBar) {
-        if (isPeerNoForwards() || hasSelectedNoforwardsMessage()) {
+        if ((isPeerNoForwards() && !isOwnerOfCurrentChat()) || hasSelectedNoforwardsMessage()) {
             // We should update text if user changed locale without re-opening chat activity
             String str;
             if (isPeerNoForwards()) {

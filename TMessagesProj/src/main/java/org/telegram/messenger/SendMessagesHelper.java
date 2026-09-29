@@ -1788,7 +1788,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             if (messageObject.messageOwner.media.photo instanceof TLRPC.TL_photo) {
                 if (!DialogObject.isEncryptedDialog(did)
                         && messageObject.messageOwner.media.ttl_seconds == 0
-                        && !isForwardOfMediaRestricted(messageObject)
+                        && (!isForwardOfMediaRestricted(messageObject) || isOwnerCacheReuploadAllowed(messageObject))
                         && tryForwardPhotoAsNewUpload(messageObject, did, payStars, monoForumPeerId, suggestionParams)) {
                     return;
                 }
@@ -1798,6 +1798,17 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 fparams.suggestionParams = suggestionParams;
                 sendMessage(fparams);
             } else if (messageObject.messageOwner.media.document instanceof TLRPC.TL_document) {
+                if (!DialogObject.isEncryptedDialog(did) && isOwnerCacheReuploadAllowed(messageObject)) {
+                    TLRPC.Document doc = messageObject.messageOwner.media.document;
+                    if (messageObject.messageOwner.media.ttl_seconds == 0
+                            && (MessageObject.isMusicDocument(doc) || MessageObject.isVoiceDocument(doc))
+                            && tryForwardAudioAsNewUpload(messageObject, did, monoForumPeerId, suggestionParams)) {
+                        return;
+                    }
+                    // Restricted source: a reference-based send would be rejected by the server anyway.
+                    showReuploadToast("Only audio and photo messages can be forwarded from a restricted channel");
+                    return;
+                }
                 SendMessagesHelper.SendMessageParams fparams = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_document) messageObject.messageOwner.media.document, null, messageObject.messageOwner.attachPath, did, messageObject.replyMessageObject, null, messageObject.messageOwner.message, messageObject.messageOwner.entities, null, params, true, 0, 0, messageObject.messageOwner.media.ttl_seconds, messageObject, null, false);
                 fparams.payStars = payStars;
                 fparams.monoForumPeer = monoForumPeerId;
@@ -1821,6 +1832,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 fparams.payStars = payStars;
                 sendMessage(fparams);
             } else if (!DialogObject.isEncryptedDialog(did)) {
+                if (isOwnerCacheReuploadAllowed(messageObject)) {
+                    // Mayogram: prevents a loop back into the owner re-upload hook in sendMessage(ArrayList...).
+                    showReuploadToast("Only audio and photo messages can be forwarded from a restricted channel");
+                    return;
+                }
                 ArrayList<MessageObject> arrayList = new ArrayList<>();
                 arrayList.add(messageObject);
                 sendMessage(arrayList, did, true, false, true, 0, 0, null, -1, payStars, monoForumPeerId, suggestionParams);
@@ -1876,6 +1892,147 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     /**
+     * Mayogram: owner-only exception to the restriction above. Returns true only when the source
+     * chat/message IS restricted AND the current user is the creator (owner) of the source channel/group,
+     * so the owner can move their own content between their own chats by re-uploading from local files.
+     * Everyone else keeps the hard stop from isForwardOfMediaRestricted().
+     */
+    private boolean isOwnerCacheReuploadAllowed(MessageObject messageObject) {
+        if (messageObject == null || messageObject.messageOwner == null) {
+            return false;
+        }
+        if (!isForwardOfMediaRestricted(messageObject)) {
+            return false;
+        }
+        long sourceDialogId = messageObject.getDialogId();
+        if (!DialogObject.isChatDialog(sourceDialogId)) {
+            return false;
+        }
+        TLRPC.Chat sourceChat = getMessagesController().getChat(-sourceDialogId);
+        return sourceChat != null && sourceChat.creator;
+    }
+
+    private void showReuploadToast(String text) {
+        AndroidUtilities.runOnUIThread(() -> Toast.makeText(ApplicationLoader.applicationContext, text, Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * Mayogram: finds a fully downloaded local copy of a document (attachPath, then the real download
+     * location e.g. Mayogram Documents/<document.id>.m4a, then the cache dir). Returns null if not complete.
+     */
+    private File findCompleteLocalDocument(MessageObject messageObject, TLRPC.Document document) {
+        ArrayList<File> candidates = new ArrayList<>();
+        if (!TextUtils.isEmpty(messageObject.messageOwner.attachPath)) {
+            candidates.add(new File(messageObject.messageOwner.attachPath));
+        }
+        candidates.add(getFileLoader().getPathToMessage(messageObject.messageOwner));
+        candidates.add(getFileLoader().getPathToAttach(document, true));
+        for (File f : candidates) {
+            if (f != null && f.exists() && f.length() > 0 && (document.size <= 0 || f.length() == document.size)) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Mayogram: owner-only re-upload of an audio (music or voice) message from the local file, keeping
+     * caption, entities and the audio attributes (duration, title, performer, voice waveform).
+     * Uses the downloaded file if present; otherwise downloads it first, then uploads.
+     */
+    private boolean tryForwardAudioAsNewUpload(MessageObject messageObject, long did, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        final TLRPC.Document srcDoc = messageObject.getDocument();
+        if (srcDoc == null) {
+            return false;
+        }
+        final String caption = messageObject.messageOwner.message;
+        final ArrayList<TLRPC.MessageEntity> entities = messageObject.messageOwner.entities;
+
+        File local = findCompleteLocalDocument(messageObject, srcDoc);
+        if (local != null) {
+            sendReuploadedAudio(local, srcDoc, did, caption, entities, monoForumPeerId, suggestionParams);
+            return true;
+        }
+
+        final String fileName = FileLoader.getAttachFileName(srcDoc);
+        final String listenerKey = fileName + "_" + did;
+        DownloadController.FileDownloadProgressListener listener = new DownloadController.FileDownloadProgressListener() {
+            private final int tag = getDownloadController().generateObserverTag();
+
+            @Override
+            public void onFailedDownload(String name, boolean canceled) {
+                forwardReuploadListeners.remove(listenerKey);
+                getDownloadController().removeLoadingFileObserver(this);
+                if (!canceled) {
+                    showReuploadToast("Audio download failed, not forwarded");
+                }
+            }
+
+            @Override
+            public void onSuccessDownload(String name) {
+                forwardReuploadListeners.remove(listenerKey);
+                getDownloadController().removeLoadingFileObserver(this);
+                File file = findCompleteLocalDocument(messageObject, srcDoc);
+                if (file != null) {
+                    sendReuploadedAudio(file, srcDoc, did, caption, entities, monoForumPeerId, suggestionParams);
+                } else {
+                    showReuploadToast("Audio file incomplete, not forwarded");
+                }
+            }
+
+            @Override
+            public void onProgressDownload(String name, long downloadedSize, long totalSize) {
+            }
+
+            @Override
+            public void onProgressUpload(String name, long downloadedSize, long totalSize, boolean isEncrypted) {
+            }
+
+            @Override
+            public int getObserverTag() {
+                return tag;
+            }
+        };
+        forwardReuploadListeners.put(listenerKey, listener);
+        getDownloadController().addLoadingFileObserver(fileName, messageObject, listener);
+        getFileLoader().loadFile(srcDoc, messageObject, FileLoader.PRIORITY_HIGH, 0);
+        return true;
+    }
+
+    private void sendReuploadedAudio(File file, TLRPC.Document srcDoc, long did, String caption, ArrayList<TLRPC.MessageEntity> entities, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        final TLRPC.TL_document document = new TLRPC.TL_document();
+        document.id = 0;
+        document.dc_id = 0;
+        document.file_reference = new byte[0];
+        document.date = getConnectionsManager().getCurrentTime();
+        document.mime_type = TextUtils.isEmpty(srcDoc.mime_type) ? "audio/mp4" : srcDoc.mime_type;
+        document.size = file.length();
+        boolean hasFileName = false;
+        for (int i = 0; i < srcDoc.attributes.size(); i++) {
+            TLRPC.DocumentAttribute attribute = srcDoc.attributes.get(i);
+            if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
+                document.attributes.add(attribute);
+            } else if (attribute instanceof TLRPC.TL_documentAttributeFilename) {
+                document.attributes.add(attribute);
+                hasFileName = true;
+            }
+        }
+        if (!hasFileName) {
+            TLRPC.TL_documentAttributeFilename fileNameAttr = new TLRPC.TL_documentAttributeFilename();
+            fileNameAttr.file_name = file.getName();
+            document.attributes.add(fileNameAttr);
+        }
+        final String path = file.getAbsolutePath();
+        final String captionFinal = caption != null ? caption : "";
+        AndroidUtilities.runOnUIThread(() -> {
+            SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(document, null, path, did, null, null, captionFinal, entities, null, null, true, 0, 0, 0, null, null, false);
+            params.monoForumPeer = monoForumPeerId;
+            params.suggestionParams = suggestionParams;
+            sendMessage(params);
+        });
+    }
+
+    /**
      * Forwards an allowed photo by re-uploading it as a brand-new photo (no "Forwarded from" header,
      * no reused photo.id/access_hash/file_reference) instead of the normal reference-based forward.
      * Uses the already-cached file when Telegram's own FileLoader cache already has it complete;
@@ -1896,6 +2053,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         final long monoForumPeer = monoForumPeerId;
         final MessageSuggestionParams sp = suggestionParams;
 
+        final boolean sourceRestricted = isForwardOfMediaRestricted(messageObject);
+        File downloaded = getFileLoader().getPathToMessage(messageObject.messageOwner);
+        if (downloaded != null && downloaded.exists() && downloaded.length() > 0) {
+            sendReuploadedPhoto(downloaded, did, caption, entities, monoForumPeer, sp);
+            return true;
+        }
         File cached = getFileLoader().getPathToAttach(largest, true);
         if (cached != null && cached.exists() && cached.length() == largest.size) {
             sendReuploadedPhoto(cached, did, caption, entities, monoForumPeer, sp);
@@ -1911,7 +2074,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 forwardReuploadListeners.remove(fileName);
                 getDownloadController().removeLoadingFileObserver(this);
                 if (!canceled) {
-                    fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
+                    if (sourceRestricted) {
+                        showReuploadToast("Photo download failed, not forwarded");
+                    } else {
+                        fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
+                    }
                 }
             }
 
@@ -1924,7 +2091,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     sendReuploadedPhoto(file, did, caption, entities, monoForumPeer, sp);
                 } else {
                     // Never treat a partial/missing file as a complete photo.
-                    fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
+                    if (sourceRestricted) {
+                        showReuploadToast("Photo file incomplete, not forwarded");
+                    } else {
+                        fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
+                    }
                 }
             }
 
@@ -2189,6 +2360,28 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     ) {
         if (messages == null || messages.isEmpty()) {
             return 0;
+        }
+        // Mayogram: messages from a restricted chat the user OWNS are re-uploaded from local files
+        // (processForwardFromMyName -> cache re-upload). Everything else uses the normal forward.
+        if (!DialogObject.isEncryptedDialog(peer)) {
+            ArrayList<MessageObject> normalForward = null;
+            for (int i = 0; i < messages.size(); i++) {
+                MessageObject m = messages.get(i);
+                if (isOwnerCacheReuploadAllowed(m)) {
+                    if (normalForward == null) {
+                        normalForward = new ArrayList<>(messages.subList(0, i));
+                    }
+                    processForwardFromMyName(m, peer, payStars, monoForumPeerId, suggestionParams);
+                } else if (normalForward != null) {
+                    normalForward.add(m);
+                }
+            }
+            if (normalForward != null) {
+                if (normalForward.isEmpty()) {
+                    return 0;
+                }
+                return sendMessage(normalForward, peer, forwardFromMyName, hideCaption, notify, scheduleDate, scheduleRepeatPeriod, replyToTopMsg, video_timestamp, payStars, monoForumPeerId, suggestionParams);
+            }
         }
         int sendResult = 0;
         long myId = getUserConfig().getClientUserId();

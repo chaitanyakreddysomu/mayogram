@@ -33,16 +33,41 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Compiling jni/ for four ABIs is most of the build time, and it rarely
+      # changes. The stripped libtmessages.49.so files are cached, keyed on the git
+      # tree of jni/ (which pins every native submodule commit), the module's
+      # build.gradle (CMake arguments) and the NDK version. On a hit, the build
+      # packages them from TMessagesProj/jniLibs/ and CMake never runs.
+      - name: Native cache key
+        id: native-key
+        run: |
+          echo "key=native-ndk27.2.12479018-$(git rev-parse HEAD:TMessagesProj/jni)-$(git rev-parse HEAD:TMessagesProj/build.gradle)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore native libraries
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: TMessagesProj/jniLibs
+          key: ${{ steps.native-key.outputs.key }}
+
       # Submodules are fetched separately rather than by actions/checkout.
       # checkout fetches them shallowly, and chromium.googlesource.com (libyuv)
       # serves Gitiles, which refuses `fetch <sha>` for a non-tip commit, so a
       # shallow submodule fetch fails with "nonexistent object". A full fetch
       # works. Retried because these hosts are occasionally flaky.
+      # With cached native libraries only the Java-side submodules are needed.
       - name: Fetch submodules
+        env:
+          NATIVE_CACHED: ${{ steps.native-cache.outputs.cache-hit }}
         run: |
+          if [ "$NATIVE_CACHED" = "true" ]; then
+            paths="TMessagesProj/lib/jlatexmath TMessagesProj_Modules/media"
+          else
+            paths=""
+          fi
           for i in 1 2 3; do
             git submodule sync --recursive
-            git submodule update --init --recursive && exit 0
+            git submodule update --init --recursive $paths && exit 0
             echo "submodule fetch failed (attempt $i), retrying..."
             sleep 15
           done
@@ -89,6 +114,31 @@ jobs:
         run: |
           ./gradlew \
             :TMessagesProj_App:assembleAfatRelease --stacktrace
+
+      # Best effort: a failure here only means the next run builds natively again.
+      - name: Collect native libraries for cache
+        id: native-collect
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: |
+          strip="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            src=$(find TMessagesProj/build/intermediates/cxx -path "*/$abi/libtmessages.49.so" | head -n 1)
+            if [ -z "$src" ]; then
+              echo "no libtmessages.49.so built for $abi" >&2
+              exit 1
+            fi
+            mkdir -p "TMessagesProj/jniLibs/$abi"
+            "$strip" --strip-unneeded -o "TMessagesProj/jniLibs/$abi/libtmessages.49.so" "$src"
+          done
+          ls -la TMessagesProj/jniLibs/*
+
+      - name: Save native libraries
+        if: steps.native-cache.outputs.cache-hit != 'true' && steps.native-collect.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: TMessagesProj/jniLibs
+          key: ${{ steps.native-key.outputs.key }}
 
       - uses: actions/upload-artifact@v4
         with:
