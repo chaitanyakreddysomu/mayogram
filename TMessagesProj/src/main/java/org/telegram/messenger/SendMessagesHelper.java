@@ -1787,9 +1787,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             }
             if (messageObject.messageOwner.media.photo instanceof TLRPC.TL_photo) {
                 if (!DialogObject.isEncryptedDialog(did)
-                        && messageObject.messageOwner.media.ttl_seconds == 0
-                        && (!isForwardOfMediaRestricted(messageObject) || isOwnerCacheReuploadAllowed(messageObject))
-                        && tryForwardPhotoAsNewUpload(messageObject, did, payStars, monoForumPeerId, suggestionParams)) {
+                    && messageObject.messageOwner.media.ttl_seconds == 0
+                    && (true)  // ← Always allow (bypass restriction check)
+                    && tryForwardPhotoAsNewUpload(messageObject, did, payStars, monoForumPeerId, suggestionParams)) {
                     return;
                 }
                 SendMessagesHelper.SendMessageParams fparams = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_photo) messageObject.messageOwner.media.photo, null, did, messageObject.replyMessageObject, null, messageObject.messageOwner.message, messageObject.messageOwner.entities, null, params, true, 0, 0, messageObject.messageOwner.media.ttl_seconds, messageObject, false);
@@ -1904,20 +1904,23 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
      * Everyone else keeps the hard stop from isForwardOfMediaRestricted().
      */
     private boolean isOwnerCacheReuploadAllowed(MessageObject messageObject) {
-        if (messageObject == null || messageObject.messageOwner == null) {
-            return false;
-        }
-        if (!isForwardOfMediaRestricted(messageObject)) {
-            return false;
-        }
-        long sourceDialogId = messageObject.getDialogId();
-        if (!DialogObject.isChatDialog(sourceDialogId)) {
-            return false;
-        }
-        TLRPC.Chat sourceChat = getMessagesController().getChat(-sourceDialogId);
-        return sourceChat != null && sourceChat.creator;
+    if (messageObject == null || messageObject.messageOwner == null) {
+        return false;
     }
-
+    // Remove this restriction check
+    // if (!isForwardOfMediaRestricted(messageObject)) {
+    //     return false;
+    // }
+    
+    long sourceDialogId = messageObject.getDialogId();
+    if (!DialogObject.isChatDialog(sourceDialogId)) {
+        return false;
+    }
+    
+    // Allow all users (remove creator check)
+    return true;  // ← Change this
+}
+    
     private void showReuploadToast(String text) {
         AndroidUtilities.runOnUIThread(() -> Toast.makeText(ApplicationLoader.applicationContext, text, Toast.LENGTH_SHORT).show());
     }
@@ -2059,7 +2062,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         final long monoForumPeer = monoForumPeerId;
         final MessageSuggestionParams sp = suggestionParams;
 
-        final boolean sourceRestricted = isForwardOfMediaRestricted(messageObject);
+        // final boolean sourceRestricted = isForwardOfMediaRestricted(messageObject);
+        final boolean sourceRestricted =false;
         File downloaded = getFileLoader().getPathToMessage(messageObject.messageOwner);
         if (downloaded != null && downloaded.exists() && downloaded.length() > 0) {
             sendReuploadedPhoto(downloaded, did, caption, entities, monoForumPeer, sp);
