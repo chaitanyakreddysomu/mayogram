@@ -8350,7 +8350,7 @@ public class MessageObject {
         if (isRepostPreview) {
             return false;
         }
-        if (isMusic() && !attachPathExists && !mediaExists()) {
+        if (isMusicNotCachedInProtectedChat()) {
             return false;
         }
         if (sideMenuEnabled) {
@@ -11596,10 +11596,14 @@ public class MessageObject {
         return canEditMessageScheduleTime(currentAccount, messageOwner, chat);
     }
 
+    public boolean isMusicNotCachedInProtectedChat() {
+        return isMusic() && !attachPathExists && !mediaExists() && MessagesController.getInstance(currentAccount).isPeerNoForwards(getDialogId());
+    }
+
     public boolean canForwardMessage() {
         if (isQuickReply()) return false;
         if (type == TYPE_GIFT_STARS || type == TYPE_GIFT_THEME_UPDATE || type == TYPE_SUGGEST_BIRTHDAY || type == TYPE_GIFT_OFFER || type == TYPE_SHARING_OFFER || type == TYPE_COMMUNITY_CHANGED) return false;
-        if (isMusic() && !attachPathExists && !mediaExists()) return false;
+        if (isMusicNotCachedInProtectedChat()) return false;
         return !(messageOwner instanceof TLRPC.TL_message_secret) && !needDrawBluredPreview() && !isLiveLocation() && type != MessageObject.TYPE_PHONE_CALL && !isSponsored();
     }
 

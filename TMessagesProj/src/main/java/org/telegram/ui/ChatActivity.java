@@ -1253,11 +1253,6 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_VIEW_STATISTICS = 115;
     public final static int OPTION_WELCOME_REVERT = 116;
 
-
-    private final ArrayList<MessageObject> pendingNewUploadMessages = new ArrayList<>();
-    private boolean waitingForNewUploadDownload;
-
-
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
             NotificationCenter.threadMessagesRead,
@@ -2877,9 +2872,6 @@ public class ChatActivity extends BaseFragment implements
 
         getNotificationCenter().addPostponeNotificationsCallback(postponeNotificationsWhileLoadingCallback);
         getNotificationCenter().addObserver(this, NotificationCenter.closeChats);
-        getNotificationCenter().addObserver(this, NotificationCenter.fileLoaded);
-        getNotificationCenter().addObserver(this, NotificationCenter.fileLoadFailed);
-
 
         if (chatMode != MODE_SCHEDULED) {
             if (threadMessageId == 0) {
@@ -3402,9 +3394,6 @@ public class ChatActivity extends BaseFragment implements
         }
 
         getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
-        getNotificationCenter().removeObserver(this, NotificationCenter.fileLoaded);
-        getNotificationCenter().removeObserver(this, NotificationCenter.fileLoadFailed);
-
 
         if (chatMode == 0 && AndroidUtilities.isTablet()) {
             getNotificationCenter().postNotificationName(NotificationCenter.openedChatChanged, dialog_id, getTopicId(), true);
@@ -14445,257 +14434,28 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressDialogIds = null;
     }
 
-    private void forwardMessages(
-        ArrayList<MessageObject> arrayList,
-        boolean fromMyName,
-        boolean hideCaption,
-        boolean notify,
-        int scheduleDate,
-        long payStars
-) {
-    if (arrayList == null || arrayList.isEmpty()) {
-        return;
-    }
-
-    if (!checkSlowModeAlert()) {
-        return;
-    }
-
-    forwardMessagesAsNewUpload(
-            arrayList,
-            notify,
-            scheduleDate,
-            payStars
-    );
-}
-
-
-    // private void forwardMessages(ArrayList<MessageObject> arrayList, boolean fromMyName, boolean hideCaption, boolean notify, int scheduleDate, long payStars) {
-    //     if (arrayList == null || arrayList.isEmpty()) {
-    //         return;
-    //     }
-    //     if (!checkSlowModeAlert()) {
-    //         return;
-    //     }
-    //     if ((scheduleDate != 0) == (chatMode == MODE_SCHEDULED)) {
-    //         waitingForSendingMessageLoad = true;
-    //         if (chatAdapter != null) {
-    //             chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
-    //         }
-    //     }
-    //     int result = 0;
-    //     if (scheduleDate == 0 && !DialogObject.isEncryptedDialog(dialog_id)) {
-    //         mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
-    //         for (int a = 0, N = arrayList.size(); a < N; a++) {
-    //             getSendMessagesHelper().processForwardFromMyName(arrayList.get(a), dialog_id, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-    //         }
-    //     } else {
-    //         result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-    //     }
-    //     AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
-    //     if (result != 0) {
-    //         AndroidUtilities.runOnUIThread(() -> {
-    //             waitingForSendingMessageLoad = false;
-    //             hideFieldPanel(true);
-    //         });
-    //     }
-    // }
-
-
-private void forwardMessagesAsNewUpload(
-        ArrayList<MessageObject> messages,
-        boolean notify,
-        int scheduleDate,
-        long payStars
-) {
-    if (messages == null || messages.isEmpty()) {
-        return;
-    }
-
-    if (!checkSlowModeAlert()) {
-        return;
-    }
-
-    pendingNewUploadMessages.clear();
-    pendingNewUploadMessages.addAll(messages);
-
-    waitingForNewUploadDownload = false;
-
-    for (int i = 0; i < pendingNewUploadMessages.size(); i++) {
-
-        MessageObject messageObject = pendingNewUploadMessages.get(i);
-
-        if (messageObject == null || messageObject.messageOwner == null) {
-            continue;
+    private void forwardMessages(ArrayList<MessageObject> arrayList, boolean fromMyName, boolean hideCaption, boolean notify, int scheduleDate, long payStars) {
+        if (arrayList == null || arrayList.isEmpty()) {
+            return;
         }
-
-        File file = FileLoader.getInstance(currentAccount)
-                .getPathToMessage(messageObject.messageOwner);
-
-        /*
-         * =====================================================
-         * FILE ALREADY DOWNLOADED
-         * =====================================================
-         */
-        if (file != null && file.exists() && file.length() > 0) {
-
-            if (messageObject.getDocument() != null) {
-
-                // Audio / video / document
-                uploadLocalFileAsNewMessage(
-                        messageObject,
-                        file,
-                        notify,
-                        scheduleDate
-                );
-
-            } else if (messageObject.getPhoto() != null) {
-
-                // Image + caption
-                uploadLocalPhotoAsNewMessage(
-                        messageObject,
-                        file,
-                        notify,
-                        scheduleDate
-                );
-            }
-
-        } else {
-
-            /*
-             * =================================================
-             * FILE NOT DOWNLOADED
-             * =================================================
-             */
-            waitingForNewUploadDownload = true;
-
-            /*
-             * AUDIO / DOCUMENT / VIDEO
-             */
-            if (messageObject.getDocument() != null) {
-
-                FileLoader.getInstance(currentAccount).loadFile(
-                        messageObject.getDocument(),
-                        messageObject,
-                        FileLoader.PRIORITY_NORMAL_UP,
-                        0
-                );
-
-            /*
-             * IMAGE
-             */
-            } else if (messageObject.getPhoto() != null) {
-
-                TLRPC.PhotoSize photoSize =
-                        FileLoader.getClosestPhotoSizeWithSize(
-                                messageObject.getPhoto().sizes,
-                                AndroidUtilities.getPhotoSize()
-                        );
-
-                if (photoSize != null) {
-
-                    FileLoader.getInstance(currentAccount).loadFile(
-                            ImageLocation.getForObject(photoSize, messageObject.getPhoto()),
-                            messageObject,
-                            "jpg",
-                            FileLoader.PRIORITY_NORMAL_UP,
-                            0
-                    );
-                }
+        if (!checkSlowModeAlert()) {
+            return;
+        }
+        if ((scheduleDate != 0) == (chatMode == MODE_SCHEDULED)) {
+            waitingForSendingMessageLoad = true;
+            if (chatAdapter != null) {
+                chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
             }
         }
+        int result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
+        AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
+        if (result != 0) {
+            AndroidUtilities.runOnUIThread(() -> {
+                waitingForSendingMessageLoad = false;
+                hideFieldPanel(true);
+            });
+        }
     }
-
-    if (!waitingForNewUploadDownload) {
-        pendingNewUploadMessages.clear();
-    }
-}
-
-
-private void uploadLocalFileAsNewMessage(
-        MessageObject messageObject,
-        File file,
-        boolean notify,
-        int scheduleDate
-) {
-    if (messageObject == null || file == null || !file.exists()) {
-        return;
-    }
-
-    String filePath = file.getAbsolutePath();
-
-    String mimeType = null;
-
-    if (messageObject.getDocument() != null) {
-        mimeType = messageObject.getDocument().mime_type;
-    }
-
-    if (mimeType == null || mimeType.length() == 0) {
-        mimeType = "application/octet-stream";
-    }
-
-    String caption = messageObject.messageOwner.message;
-
-    SendMessagesHelper.prepareSendingDocument(
-            getAccountInstance(),
-            filePath,
-            filePath,
-            null,
-            caption,
-            mimeType,
-            dialog_id,
-            null,
-            null,
-            null,
-            null,
-            null,
-            notify,
-            scheduleDate,
-            null,
-            null,
-            false
-    );
-}
-
-
-private void uploadLocalPhotoAsNewMessage(
-        MessageObject messageObject,
-        File file,
-        boolean notify,
-        int scheduleDate
-) {
-    if (messageObject == null ||
-            messageObject.messageOwner == null ||
-            file == null ||
-            !file.exists() ||
-            file.length() == 0) {
-        return;
-    }
-
-    String filePath = file.getAbsolutePath();
-
-    CharSequence caption = messageObject.messageOwner.message;
-
-    SendMessagesHelper.prepareSendingPhoto(
-            getAccountInstance(),
-            filePath,
-            null,
-            dialog_id,
-            null,
-            null,
-            null,
-            caption,
-            messageObject.messageOwner.entities,
-            null,
-            null,
-            0,
-            null,
-            notify,
-            scheduleDate,
-            0,
-            null
-    );
-}
 
     public boolean shouldShowImport() {
         return openImport;
@@ -20788,123 +20548,21 @@ private void uploadLocalPhotoAsNewMessage(
             unreadMessageObject = null;
         }
     }
-    
+
     @Override
-public void didReceivedNotification(int id, int account, final Object... args) {
-    if (id == NotificationCenter.messagesDidLoad) {
-        didReceivedNotification_messagesDidLoad(id, account, args);
-    } else {
-        didReceivedNotification2(id, account, args);
-        didReceivedNotification3(id, account, args);
-        didReceivedNotification4(id, account, args);
-        didReceivedNotification5(id, account, args);
-        didReceivedNotification6(id, account, args);
-        didReceivedNotification7(id, account, args);
+    public void didReceivedNotification(int id, int account, final Object... args) {
+        if (id == NotificationCenter.messagesDidLoad) {
+            didReceivedNotification_messagesDidLoad(id, account, args);
+        } else {
+            didReceivedNotification2(id, account, args);
+            didReceivedNotification3(id, account, args);
+            didReceivedNotification4(id, account, args);
+            didReceivedNotification5(id, account, args);
+            didReceivedNotification6(id, account, args);
+            didReceivedNotification7(id, account, args);
+        }
     }
 
-    // =========================================================
-    // FORWARD AS NEW UPLOAD - DOWNLOAD COMPLETED
-    // =========================================================
-    
-    if (id == NotificationCenter.fileLoaded) {
-
-    if (!waitingForNewUploadDownload) {
-        return;
-    }
-
-    if (args == null || args.length == 0 || args[0] == null) {
-        return;
-    }
-
-    String loadedFileName = (String) args[0];
-
-    for (int i = pendingNewUploadMessages.size() - 1; i >= 0; i--) {
-
-        MessageObject messageObject = pendingNewUploadMessages.get(i);
-
-        if (messageObject == null || messageObject.messageOwner == null) {
-            pendingNewUploadMessages.remove(i);
-            continue;
-        }
-
-        File file = FileLoader.getInstance(currentAccount)
-                .getPathToMessage(messageObject.messageOwner);
-
-        if (file == null || !file.exists() || file.length() == 0) {
-            continue;
-        }
-
-        /*
-         * Make sure this is the file that finished downloading.
-         */
-        if (!file.getName().equals(loadedFileName)) {
-            continue;
-        }
-
-        /*
-         * =====================================================
-         * DOWNLOAD FINISHED
-         * =====================================================
-         */
-
-        if (messageObject.getDocument() != null) {
-
-            // Audio / video / document
-            uploadLocalFileAsNewMessage(
-                    messageObject,
-                    file,
-                    true,
-                    0
-            );
-
-        } else if (messageObject.getPhoto() != null) {
-
-            // Image + caption
-            uploadLocalPhotoAsNewMessage(
-                    messageObject,
-                    file,
-                    true,
-                    0
-            );
-        }
-
-        pendingNewUploadMessages.remove(i);
-    }
-
-    if (pendingNewUploadMessages.isEmpty()) {
-        waitingForNewUploadDownload = false;
-    }
-
-    return;
-}
-
-
-    // =========================================================
-    // FORWARD AS NEW UPLOAD - DOWNLOAD FAILED
-    // =========================================================
-    if (id == NotificationCenter.fileLoadFailed) {
-
-        if (!waitingForNewUploadDownload) {
-            return;
-        }
-
-        if (args != null && args.length > 0 && args[0] != null) {
-
-            String failedFileName = (String) args[0];
-
-            FileLog.e(
-                    "ForwardAsNewUpload: download failed: "
-                            + failedFileName
-            );
-        }
-
-        return;
-    }
-}
-
-    
-
-    
     private void didReceivedNotification_messagesDidLoad(int id, int account, final Object... args) {
         int guid = (Integer) args[10];
         if (guid != classGuid) {
@@ -34824,17 +34482,6 @@ public void didReceivedNotification(int id, int account, final Object... args) {
 
                 messagePreviewParams = null;
                 hideFieldPanel(false);
-                if (scheduleDate == 0) {
-                    java.util.ArrayList<Long> reuploadDialogIds = new java.util.ArrayList<>();
-                    for (int a = 0; a < dids.size(); a++) {
-                        long did = dids.get(a).dialogId;
-                        if (!DialogObject.isEncryptedDialog(did)) {
-                            reuploadDialogIds.add(did);
-                        }
-                    }
-                    int itemsPerDialog = fmessages.size() + (TextUtils.isEmpty(message) ? 0 : 1);
-                    mayoStartForwardProgress(reuploadDialogIds, reuploadDialogIds.size() * itemsPerDialog);
-                }
                 for (int a = 0; a < dids.size(); a++) {
                     final long did = dids.get(a).dialogId;
                     final Long price = prices == null ? (Long) 0L : prices.get(did);
@@ -34846,13 +34493,7 @@ public void didReceivedNotification(int id, int account, final Object... args) {
                         params.suggestionParams = messageSuggestionParams;
                         getSendMessagesHelper().sendMessage(params);
                     }
-                    if (scheduleDate == 0 && !DialogObject.isEncryptedDialog(did)) {
-                        for (int i = 0; i < fmessages.size(); i++) {
-                            getSendMessagesHelper().processForwardFromMyName(fmessages.get(i), did, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-                        }
-                    } else {
-                        getSendMessagesHelper().sendMessage(fmessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-                    }
+                    getSendMessagesHelper().sendMessage(fmessages, did, false, false, notify, scheduleDate, scheduleRepeatPeriod, null, -1, price == null ? 0 : price, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
                 }
                 fragment.finishFragment();
                 createUndoView();
@@ -46563,7 +46204,7 @@ public void didReceivedNotification(int id, int account, final Object... args) {
                     && !message.isExpiredStory()
                     && message.type != MessageObject.TYPE_STORY_MENTION
                     && message.type != MessageObject.TYPE_GIFT_STARS
-                    && (!selectedObject.isMusic() || selectedObject.attachPathExists || selectedObject.mediaExists());
+                    && !selectedObject.isMusicNotCachedInProtectedChat();
                 if (canForward) {
                     items.add(LocaleController.getString(R.string.Forward));
                     options.add(OPTION_FORWARD);
