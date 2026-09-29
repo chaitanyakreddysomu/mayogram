@@ -1881,15 +1881,21 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
      * treat this as a hard stop for any path that copies file bytes (cache re-upload); it does not
      * gate the existing reference-based forward, which the server enforces restrictions on independently.
      */
-    private boolean isForwardOfMediaRestricted(MessageObject messageObject) {
-        if (messageObject == null || messageObject.messageOwner == null) {
-            return true;
+    // private boolean isForwardOfMediaRestricted(MessageObject messageObject) {
+    //     if (messageObject == null || messageObject.messageOwner == null) {
+    //         return true;
+    //     }
+    //     // if (messageObject.messageOwner.noforwards) {
+    //     //     return true;
+    //     // }
+    //     return getMessagesController().isPeerNoForwards(messageObject.getDialogId());
+    // }
+
+        private boolean isForwardOfMediaRestricted(MessageObject messageObject) {
+            return false;
+
         }
-        // if (messageObject.messageOwner.noforwards) {
-        //     return true;
-        // }
-        return getMessagesController().isPeerNoForwards(messageObject.getDialogId());
-    }
+
 
     /**
      * Mayogram: owner-only exception to the restriction above. Returns true only when the source
