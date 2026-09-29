@@ -1644,6 +1644,9 @@ public class FileLoader extends BaseController {
     public static String getAttachFileName(TLObject attach, String size, String ext) {
         if (attach instanceof TLRPC.Document) {
             TLRPC.Document document = (TLRPC.Document) attach;
+            if (MessageObject.isMusicDocument(document)) {
+                return document.id + ".m4a";
+            }
             String docExt;
             docExt = getDocumentFileName(document);
             int idx;
