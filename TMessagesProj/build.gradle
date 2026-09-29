@@ -117,11 +117,23 @@ android {
     buildToolsVersion '36.0.0'
     ndkVersion "27.2.12479018"
 
-    sourceSets.main.jniLibs.srcDirs = ['./jni/']
-
-    externalNativeBuild {
-        cmake {
-            path 'jni/CMakeLists.txt'
+    // Compiling jni/ (TDLib, WebRTC, ffmpeg, ...) takes far longer than the Java
+    // side. When scripts/update-prebuilt-native.ps1 has populated jniLibs/, those
+    // stripped libraries are packaged as-is and CMake never runs. Pass
+    // -PbuildNative to compile jni/ again (needed after changing C/C++ code).
+    // CI has no jniLibs/ (it is gitignored), so it always builds natively.
+    // jni/ holds sources only (no .so), so it must not be a jniLibs dir: AGP
+    // would copy its ~32k files into build/ on every build.
+    def usePrebuiltNative = !project.hasProperty('buildNative') && file('jniLibs/arm64-v8a/libtmessages.49.so').exists()
+    if (usePrebuiltNative) {
+        logger.lifecycle("TMessagesProj: using prebuilt native libraries from jniLibs/ (pass -PbuildNative to compile jni/)")
+        sourceSets.main.jniLibs.srcDirs = ['jniLibs']
+    } else {
+        sourceSets.main.jniLibs.srcDirs = []
+        externalNativeBuild {
+            cmake {
+                path 'jni/CMakeLists.txt'
+            }
         }
     }
 
