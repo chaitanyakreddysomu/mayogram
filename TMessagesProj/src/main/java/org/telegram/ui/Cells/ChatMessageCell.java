@@ -1308,6 +1308,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private CountdownTimer pollCountDownTimer;
     private StaticLayout loadingProgressLayout;
     private long loadingProgressLayoutHash;
+
+    // Mayogram: live transfer speed for music messages ("↓ 1.8 MB/s" / "↑ 900 KB/s")
+    private StaticLayout transferSpeedLayout;
+    private long speedLastBytes;
+    private long speedLastTime;
+    private long speedLastUpdate;
+    private double speedBytesPerSec;
+    private boolean speedIsUpload;
     private int infoX;
     private int infoWidth;
 
@@ -11253,6 +11261,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             loadingProgressLayout = null;
             animatingLoadingProgressProgress = 0;
             lastLoadingSizeTotal = 0;
+            resetTransferSpeed();
             selectedBackgroundProgress = 0f;
             if (statusDrawableAnimator != null) {
                 statusDrawableAnimator.removeAllListeners();
@@ -14681,9 +14690,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 canvas.restore();
             }
 
+            if (transferSpeedLayout != null && SystemClock.elapsedRealtime() - speedLastUpdate > 3000) {
+                transferSpeedLayout = null; // transfer stopped/cancelled without a callback
+            }
             canvas.save();
             canvas.translate(tx + timeAudioX, dp(57) + namesOffset + getMediaOffsetY());
-            durationLayout.draw(canvas);
+            if (transferSpeedLayout != null) {
+                transferSpeedLayout.draw(canvas);
+            } else {
+                durationLayout.draw(canvas);
+            }
             canvas.restore();
 
             if (shouldDrawMenuDrawable()) {
@@ -18063,11 +18079,13 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     @Override
     public void onFailedDownload(String fileName, boolean canceled) {
+        resetTransferSpeed();
         updateButtonState(true, documentAttachType == DOCUMENT_ATTACH_TYPE_AUDIO || documentAttachType == DOCUMENT_ATTACH_TYPE_MUSIC, false);
     }
 
     @Override
     public void onSuccessDownload(String fileName) {
+        resetTransferSpeed();
         if (documentAttachType == DOCUMENT_ATTACH_TYPE_STICKER && currentMessageObject.isDice()) {
             DownloadController.getInstance(currentAccount).removeLoadingFileObserver(this);
             setCurrentDiceValue(true);
@@ -18242,6 +18260,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     public void onProgressDownload(String fileName, long downloadedSize, long totalSize) {
         float progress = totalSize == 0 ? 0 : Math.min(1f, downloadedSize / (float) totalSize);
         currentMessageObject.loadedFileSize = downloadedSize;
+        updateTransferSpeed(downloadedSize, totalSize, false);
         createLoadingProgressLayout(downloadedSize, totalSize);
         if (drawVideoImageButton) {
             videoRadialProgress.setProgress(progress, true);
@@ -18275,6 +18294,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     public void onProgressUpload(String fileName, long uploadedSize, long totalSize, boolean isEncrypted) {
         float progress = totalSize == 0 ? 0 : Math.min(1f, uploadedSize / (float) totalSize);
         currentMessageObject.loadedFileSize = uploadedSize;
+        updateTransferSpeed(uploadedSize, totalSize, true);
         radialProgress.setProgress(progress, true);
         if (uploadedSize == totalSize && (currentPosition != null || currentMessageObject.isPaid())) {
             boolean sending = SendMessagesHelper.getInstance(currentAccount).isSendingMessage(currentMessageObject.getId());
@@ -18289,6 +18309,50 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             lastLoadingSizeTotal = totalSize;
         }
         createLoadingProgressLayout(uploadedSize, totalSize);
+    }
+
+    private void resetTransferSpeed() {
+        transferSpeedLayout = null;
+        speedLastBytes = 0;
+        speedLastTime = 0;
+        speedLastUpdate = 0;
+        speedBytesPerSec = 0;
+    }
+
+    /** Mayogram: measures bytes/sec for music downloads/uploads and builds the "↓ 1.8 MB/s" line. */
+    private void updateTransferSpeed(long doneBytes, long totalBytes, boolean upload) {
+        if (documentAttachType != DOCUMENT_ATTACH_TYPE_MUSIC) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (totalBytes > 0 && doneBytes >= totalBytes) {
+            resetTransferSpeed();
+            invalidate();
+            return;
+        }
+        if (speedLastTime == 0 || upload != speedIsUpload || doneBytes < speedLastBytes) {
+            speedIsUpload = upload;
+            speedLastBytes = doneBytes;
+            speedLastTime = now;
+            speedLastUpdate = now;
+            speedBytesPerSec = 0;
+            return;
+        }
+        long dt = now - speedLastTime;
+        if (dt < 700) {
+            return; // update about once per 0.7s so the number doesn't flicker
+        }
+        double instant = (doneBytes - speedLastBytes) * 1000.0 / dt;
+        speedBytesPerSec = speedBytesPerSec <= 0 ? instant : speedBytesPerSec * 0.6 + instant * 0.4;
+        speedLastBytes = doneBytes;
+        speedLastTime = now;
+        speedLastUpdate = now;
+
+        String text = (upload ? "\u2191 " : "\u2193 ") + AndroidUtilities.formatFileSize((long) speedBytesPerSec) + "/s";
+        int w = (int) Math.ceil(Theme.chat_audioTimePaint.measureText(text));
+        transferSpeedLayout = new StaticLayout(text, Theme.chat_audioTimePaint, w, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+        invalidate();
+        postInvalidateDelayed(3100); // lets the 3s stale check hide it if the transfer stops
     }
 
     private void createLoadingProgressLayout(TLRPC.Document document) {
