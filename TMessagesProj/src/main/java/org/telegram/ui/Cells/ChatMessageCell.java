@@ -18320,10 +18320,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     /** Mayogram: measures bytes/sec for music downloads/uploads and builds the "↓ 1.8 MB/s" line. */
+    /**
+     * Mayogram: measures bytes/sec for any upload/download. Music messages show
+     * "2.1 MB / 5.4 MB • ↓ 1.8 MB/s" on the duration line; videos/GIFs/files get the
+     * same " • ↓ 1.8 MB/s" suffix on their progress label (createLoadingProgressLayout).
+     */
     private void updateTransferSpeed(long doneBytes, long totalBytes, boolean upload) {
-        if (documentAttachType != DOCUMENT_ATTACH_TYPE_MUSIC) {
-            return;
-        }
         long now = SystemClock.elapsedRealtime();
         if (totalBytes > 0 && doneBytes >= totalBytes) {
             resetTransferSpeed();
@@ -18334,25 +18336,42 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             speedIsUpload = upload;
             speedLastBytes = doneBytes;
             speedLastTime = now;
-            speedLastUpdate = now;
             speedBytesPerSec = 0;
-            return;
+        } else {
+            long dt = now - speedLastTime;
+            if (dt >= 700) { // update about once per 0.7s so the number doesn't flicker
+                double instant = (doneBytes - speedLastBytes) * 1000.0 / dt;
+                speedBytesPerSec = speedBytesPerSec <= 0 ? instant : speedBytesPerSec * 0.6 + instant * 0.4;
+                speedLastBytes = doneBytes;
+                speedLastTime = now;
+            }
         }
-        long dt = now - speedLastTime;
-        if (dt < 700) {
-            return; // update about once per 0.7s so the number doesn't flicker
-        }
-        double instant = (doneBytes - speedLastBytes) * 1000.0 / dt;
-        speedBytesPerSec = speedBytesPerSec <= 0 ? instant : speedBytesPerSec * 0.6 + instant * 0.4;
-        speedLastBytes = doneBytes;
-        speedLastTime = now;
         speedLastUpdate = now;
 
-        String text = (upload ? "\u2191 " : "\u2193 ") + AndroidUtilities.formatFileSize((long) speedBytesPerSec) + "/s";
-        int w = (int) Math.ceil(Theme.chat_audioTimePaint.measureText(text));
-        transferSpeedLayout = new StaticLayout(text, Theme.chat_audioTimePaint, w, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+        if (documentAttachType == DOCUMENT_ATTACH_TYPE_MUSIC) {
+            String sizes = totalBytes > 0
+                    ? AndroidUtilities.formatFileSize(doneBytes) + " / " + AndroidUtilities.formatFileSize(totalBytes)
+                    : AndroidUtilities.formatFileSize(doneBytes);
+            String text = sizes + getTransferSpeedSuffix();
+            int maxW = backgroundWidth - dp(92);
+            int w = (int) Math.ceil(Theme.chat_audioTimePaint.measureText(text));
+            if (maxW > 0 && w > maxW) {
+                String speedOnly = getTransferSpeedSuffix();
+                text = speedOnly.isEmpty() ? sizes : speedOnly.substring(3); // drop leading " • "
+                w = (int) Math.ceil(Theme.chat_audioTimePaint.measureText(text));
+            }
+            transferSpeedLayout = new StaticLayout(text, Theme.chat_audioTimePaint, w, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+        }
         invalidate();
         postInvalidateDelayed(3100); // lets the 3s stale check hide it if the transfer stops
+    }
+
+    /** Mayogram: " • ↑ 1.2 MB/s" (or ↓ for downloads), or "" until the first measurement. */
+    private String getTransferSpeedSuffix() {
+        if (speedBytesPerSec <= 0 || SystemClock.elapsedRealtime() - speedLastUpdate > 3000) {
+            return "";
+        }
+        return " \u2022 " + (speedIsUpload ? "\u2191 " : "\u2193 ") + AndroidUtilities.formatFileSize((long) speedBytesPerSec) + "/s";
     }
 
     private void createLoadingProgressLayout(TLRPC.Document document) {
@@ -18396,7 +18415,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (documentAttachType == DOCUMENT_ATTACH_TYPE_DOCUMENT) {
             int max = Math.max(this.infoWidth, docTitleWidth);
             if (w <= max) {
-                str = String.format("%s / %s", AndroidUtilities.formatFileSize(loadedSize), totalStr);
+                str = String.format("%s / %s", AndroidUtilities.formatFileSize(loadedSize), totalStr) + getTransferSpeedSuffix();
             } else {
                 str = AndroidUtilities.formatFileSize(loadedSize);
             }
@@ -18413,10 +18432,15 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     str = String.format(Locale.US, "%2d%%", percent);
                 }
             } else {
-                str = String.format("%s / %s", AndroidUtilities.formatFileSize(loadedSize), totalStr);
+                str = String.format("%s / %s", AndroidUtilities.formatFileSize(loadedSize), totalStr) + getTransferSpeedSuffix();
             }
         }
         w = (int) Math.ceil(Theme.chat_infoPaint.measureText(str));
+        String speedSuffix = getTransferSpeedSuffix();
+        if (fullWidth && w > backgroundWidth - dp(48) && !speedSuffix.isEmpty() && str.endsWith(speedSuffix)) {
+            str = str.substring(0, str.length() - speedSuffix.length()); // no room: drop speed before falling back to %
+            w = (int) Math.ceil(Theme.chat_infoPaint.measureText(str));
+        }
         if (fullWidth && w > backgroundWidth - dp(48)) {
             int percent = (int) (Math.min(1f, loadedSize / (float) totalSize) * 100);
             if (percent >= 100) {
