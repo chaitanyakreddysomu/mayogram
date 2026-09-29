@@ -14589,14 +14589,15 @@ private void forwardMessagesAsNewUpload(
                 TLRPC.PhotoSize photoSize =
                         FileLoader.getClosestPhotoSizeWithSize(
                                 messageObject.getPhoto().sizes,
-                                AndroidUtilities.getPhotoSize(true)
+                                AndroidUtilities.getPhotoSize()
                         );
 
                 if (photoSize != null) {
 
                     FileLoader.getInstance(currentAccount).loadFile(
-                            photoSize,
+                            ImageLocation.getForObject(photoSize, messageObject.getPhoto()),
                             messageObject,
+                            "jpg",
                             FileLoader.PRIORITY_NORMAL_UP,
                             0
                     );
@@ -14692,11 +14693,7 @@ private void uploadLocalPhotoAsNewMessage(
             notify,
             scheduleDate,
             0,
-            false,
-            null,
-            null,
-            0,
-            0
+            null
     );
 }
 
