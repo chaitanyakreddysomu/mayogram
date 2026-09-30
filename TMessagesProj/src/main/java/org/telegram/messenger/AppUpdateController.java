@@ -99,8 +99,8 @@ public class AppUpdateController {
 
     /** Numeric, dot-separated compare ("1.10" > "1.9"). */
     public static int compareVersions(String a, String b) {
-        String[] pa = a.trim().split("\.");
-        String[] pb = b.trim().split("\.");
+        String[] pa = a.trim().split("\\.");
+        String[] pb = b.trim().split("\\.");
         for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
             int va = i < pa.length ? parse(pa[i]) : 0;
             int vb = i < pb.length ? parse(pb[i]) : 0;
