@@ -114,6 +114,7 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -977,6 +978,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             getNotificationCenter().addObserver(SendMessagesHelper.this, NotificationCenter.httpFileDidLoad);
             getNotificationCenter().addObserver(SendMessagesHelper.this, NotificationCenter.fileLoaded);
             getNotificationCenter().addObserver(SendMessagesHelper.this, NotificationCenter.fileLoadFailed);
+            getNotificationCenter().addObserver(SendMessagesHelper.this, NotificationCenter.messageReceivedByServer);
+            getNotificationCenter().addObserver(SendMessagesHelper.this, NotificationCenter.messageSendError);
         });
     }
 
@@ -996,10 +999,22 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         importingStickersFiles.clear();
         importingStickersMap.clear();
         locationProvider.stop();
+        forwardJobs.clear();
+        forwardJobRunning = false;
+        forwardJobAwaitingSend = false;
+        forwardJobAsyncPending = false;
+        forwardJobMessageId = 0;
+        forwardJobSeq++;
     }
 
     @Override
     public void didReceivedNotification(int id, int account, final Object... args) {
+        if (id == NotificationCenter.messageReceivedByServer || id == NotificationCenter.messageSendError) {
+            if (args.length > 0 && args[0] instanceof Integer) {
+                onForwardJobMessageDone((Integer) args[0]);
+            }
+            return;
+        }
         if (id == NotificationCenter.fileUploadProgressChanged) {
             String fileName = (String) args[0];
             ImportingHistory importingHistory = importingHistoryFiles.get(fileName);
@@ -1677,6 +1692,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 }
             }
         }
+        if (forwardJobMessageId != 0 && messageIds.contains(forwardJobMessageId)) {
+            finishForwardJob();
+        }
         for (int a = 0; a < keysToRemove.size(); a++) {
             String key = keysToRemove.get(a);
             if (key.startsWith("http")) {
@@ -1775,10 +1793,105 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
     }
 
+    // Mayogram: "forward from my name" runs strictly one message at a time, in the order the
+    // messages were selected. A job is done only when its message is confirmed by the server
+    // (or failed / was cancelled / was never created), so a small file 2 can no longer be
+    // downloaded, uploaded or sent before a large file 1. All state is touched on the UI thread.
+    private final ArrayDeque<Runnable> forwardJobs = new ArrayDeque<>();
+    private boolean forwardJobRunning;
+    private boolean forwardJobExecuting;
+    private boolean forwardJobAwaitingSend;
+    private boolean forwardJobAsyncPending;
+    private int forwardJobMessageId;
+    private int forwardJobSeq;
+
+    private void enqueueForwardJob(Runnable job) {
+        forwardJobs.add(job);
+        if (!forwardJobRunning) {
+            runNextForwardJob();
+        }
+    }
+
+    private void runNextForwardJob() {
+        Runnable job = forwardJobs.poll();
+        if (job == null) {
+            forwardJobRunning = false;
+            return;
+        }
+        forwardJobRunning = true;
+        forwardJobAwaitingSend = true;
+        forwardJobAsyncPending = false;
+        forwardJobMessageId = 0;
+        forwardJobSeq++;
+        forwardJobExecuting = true;
+        try {
+            job.run();
+        } catch (Exception e) {
+            FileLog.e(e);
+            forwardJobAsyncPending = false;
+        } finally {
+            forwardJobExecuting = false;
+        }
+        if (forwardJobAwaitingSend && !forwardJobAsyncPending) {
+            finishForwardJob();
+        }
+    }
+
+    private void finishForwardJob() {
+        if (!forwardJobRunning) {
+            return;
+        }
+        forwardJobAwaitingSend = false;
+        forwardJobAsyncPending = false;
+        forwardJobMessageId = 0;
+        forwardJobSeq++;
+        AndroidUtilities.runOnUIThread(this::runNextForwardJob);
+    }
+
+    /** The current job continues later (download, or a send posted to another thread). */
+    private int markForwardJobAsync() {
+        if (forwardJobRunning) {
+            forwardJobAsyncPending = true;
+        }
+        return forwardJobSeq;
+    }
+
+    /** The async part of job {@code seq} finished; if it created no message, move on. */
+    private void onForwardJobAsyncDone(int seq) {
+        if (forwardJobRunning && seq == forwardJobSeq) {
+            forwardJobAsyncPending = false;
+            if (forwardJobAwaitingSend) {
+                finishForwardJob();
+            }
+        }
+    }
+
+    private void captureForwardJobMessage(int localId) {
+        if (forwardJobRunning && forwardJobAwaitingSend) {
+            forwardJobAwaitingSend = false;
+            forwardJobMessageId = localId;
+        }
+    }
+
+    private void onForwardJobMessageDone(int localId) {
+        if (forwardJobRunning && forwardJobMessageId != 0 && forwardJobMessageId == localId) {
+            finishForwardJob();
+        }
+    }
+
     public void processForwardFromMyName(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
         if (messageObject == null) {
             return;
         }
+        if (forwardJobExecuting) {
+            // Re-entry from inside the current job (e.g. via sendMessage(ArrayList)): same job.
+            processForwardFromMyNameNow(messageObject, did, payStars, monoForumPeerId, suggestionParams);
+            return;
+        }
+        enqueueForwardJob(() -> processForwardFromMyNameNow(messageObject, did, payStars, monoForumPeerId, suggestionParams));
+    }
+
+    private void processForwardFromMyNameNow(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
         if (messageObject.messageOwner.media != null && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaEmpty) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaGame) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaInvoice)) {
             HashMap<String, String> params = null;
             if (DialogObject.isEncryptedDialog(did) && messageObject.messageOwner.peer_id != null && (messageObject.messageOwner.media.photo instanceof TLRPC.TL_photo || messageObject.messageOwner.media.document instanceof TLRPC.TL_document)) {
@@ -1997,6 +2110,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
 
         final String fileName = FileLoader.getAttachFileName(srcDoc);
         final String listenerKey = fileName + "_" + did;
+        final int jobSeq = markForwardJobAsync();
         DownloadController.FileDownloadProgressListener listener = new DownloadController.FileDownloadProgressListener() {
             private final int tag = getDownloadController().generateObserverTag();
 
@@ -2007,6 +2121,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                 if (!canceled) {
                     showReuploadToast("Audio download failed, not forwarded");
                 }
+                onForwardJobAsyncDone(jobSeq);
             }
 
             @Override
@@ -2018,6 +2133,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                     sendReuploadedAudio(file, srcDoc, did, caption, entities, monoForumPeerId, suggestionParams);
                 } else {
                     showReuploadToast("Audio file incomplete, not forwarded");
+                    onForwardJobAsyncDone(jobSeq);
                 }
             }
 
@@ -2065,11 +2181,13 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
         }
         final String path = file.getAbsolutePath();
         final String captionFinal = caption != null ? caption : "";
+        final int jobSeq = markForwardJobAsync();
         AndroidUtilities.runOnUIThread(() -> {
             SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(document, null, path, did, null, null, captionFinal, entities, null, null, true, 0, 0, 0, null, null, false);
             params.monoForumPeer = monoForumPeerId;
             params.suggestionParams = suggestionParams;
             sendMessage(params);
+            onForwardJobAsyncDone(jobSeq);
         });
     }
 
@@ -2108,6 +2226,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
         }
 
         final String fileName = FileLoader.getAttachFileName(largest);
+        final int jobSeq = markForwardJobAsync();
         DownloadController.FileDownloadProgressListener listener = new DownloadController.FileDownloadProgressListener() {
             private final int tag = getDownloadController().generateObserverTag();
 
@@ -2122,6 +2241,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                         fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
                     }
                 }
+                onForwardJobAsyncDone(jobSeq);
             }
 
             @Override
@@ -2138,6 +2258,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                     } else {
                         fallbackToReferenceForward(messageObject, did, payStars, monoForumPeer, sp);
                     }
+                    onForwardJobAsyncDone(jobSeq);
                 }
             }
 
@@ -2169,6 +2290,10 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
     }
 
     private void sendReuploadedPhoto(File file, long did, String caption, ArrayList<TLRPC.MessageEntity> entities, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        // prepareSendingPhoto builds the message on a worker thread and reports nothing back if it
+        // gives up, so don't hold the queue forever waiting for it to appear.
+        final int jobSeq = markForwardJobAsync();
+        AndroidUtilities.runOnUIThread(() -> onForwardJobAsyncDone(jobSeq), 60_000);
         AccountInstance accountInstance = AccountInstance.getInstance(currentAccount);
         prepareSendingPhoto(accountInstance, file.getAbsolutePath(), null, (Uri) null, did,
                 null, null, null, null, entities, null, null, 0, null, null, true, 0, 0, 0,
@@ -5148,6 +5273,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                     newMsg.attachPath = "";
                 }
                 newMsg.local_id = newMsg.id = getUserConfig().getNewMessageId();
+                captureForwardJobMessage(newMsg.id);
                 newMsg.out = true;
                 TLRPC.Chat chat = sendToPeer != null ? getMessagesController().getChat(sendToPeer.channel_id) : null;
                 if (isChannel && sendToPeer != null && (chat == null || !chat.signatures)) {
