@@ -42,6 +42,7 @@ public class AppUpdateController {
         public String version;
         public String downloadUrl;
         public String changelog;
+        public java.util.List<String> features;
     }
 
     public interface CheckCallback {
@@ -88,11 +89,13 @@ public class AppUpdateController {
                     info.changelog = json.optString("changelog", "");
                     org.json.JSONArray features = json.optJSONArray("features");
                     if (features != null && features.length() > 0) {
-                        StringBuilder sb = new StringBuilder();
+                        info.features = new java.util.ArrayList<>();
                         for (int i = 0; i < features.length(); i++) {
-                            sb.append(features.optString(i)).append("\n");
+                            String f = features.optString(i);
+                            if (!f.trim().isEmpty()) {
+                                info.features.add(f.trim());
+                            }
                         }
-                        info.changelog = sb.toString();
                     }
                 }
             } catch (Throwable e) {
