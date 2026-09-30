@@ -86,6 +86,14 @@ public class AppUpdateController {
                     info.version = latest;
                     info.downloadUrl = json.getString("downloadUrl");
                     info.changelog = json.optString("changelog", "");
+                    org.json.JSONArray features = json.optJSONArray("features");
+                    if (features != null && features.length() > 0) {
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < features.length(); i++) {
+                            sb.append(features.optString(i)).append("\n");
+                        }
+                        info.changelog = sb.toString();
+                    }
                 }
             } catch (Throwable e) {
                 FileLog.e(e);
