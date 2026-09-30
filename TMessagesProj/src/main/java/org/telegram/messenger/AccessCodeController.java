@@ -18,6 +18,7 @@ import android.util.Base64;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.telegram.tgnet.TLRPC;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -189,14 +190,20 @@ public class AccessCodeController {
     }
 
     /**
-     * Best-effort: links the now-known Telegram account to this installation's
-     * redeemed row, so the admin token list shows who redeemed each code.
-     * Fire-and-forget - login must never be blocked or failed by this.
+     * Best-effort: records the now-known Telegram account against this
+     * installation, one row per account, so the admin page shows every account
+     * logged in with each code. Fire-and-forget - login must never be blocked
+     * or failed by this.
      */
-    public static void linkTelegramAccount(final long telegramUserId, final String telegramUsername) {
-        if (!isGateConfigured()) {
+    public static void linkTelegramAccount(final TLRPC.User user) {
+        if (!isGateConfigured() || user == null) {
             return;
         }
+        final long telegramUserId = user.id;
+        final String telegramUsername = UserObject.getPublicUsername(user);
+        final String firstName = user.first_name;
+        final String lastName = user.last_name;
+        final String phone = user.phone;
         Utilities.globalQueue.postRunnable(() -> {
             HttpURLConnection connection = null;
             try {
@@ -214,6 +221,9 @@ public class AccessCodeController {
                 body.put("p_installation_id", getInstallationId());
                 body.put("p_telegram_user_id", telegramUserId);
                 body.put("p_telegram_username", telegramUsername != null ? telegramUsername : "");
+                body.put("p_first_name", firstName != null ? firstName : "");
+                body.put("p_last_name", lastName != null ? lastName : "");
+                body.put("p_phone", phone != null ? phone : "");
 
                 OutputStream out = connection.getOutputStream();
                 out.write(body.toString().getBytes(StandardCharsets.UTF_8));

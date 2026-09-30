@@ -91,7 +91,41 @@
     return td;
   }
 
-  function render(list) {
+  function accountLine(a) {
+    var name = [a.first_name, a.last_name].filter(Boolean).join(" ");
+    var parts = [];
+    if (name) parts.push(name);
+    if (a.username) parts.push("@" + a.username);
+    if (a.phone) parts.push("+" + String(a.phone).replace(/^\+/, ""));
+    parts.push("ID " + a.telegram_user_id);
+    return parts.join(" · ");
+  }
+
+  function accountsCell(row, accounts) {
+    var td = document.createElement("td");
+    if (!accounts.length) {
+      var fallback = row.telegram_username ? "@" + row.telegram_username
+        : (row.telegram_user_id ? String(row.telegram_user_id) : "");
+      td.textContent = fallback || "—";
+      if (!fallback) td.classList.add("dim");
+      return td;
+    }
+    accounts.forEach(function (a) {
+      var div = document.createElement("div");
+      div.textContent = accountLine(a);
+      div.title = "Last login " + formatDate(a.last_login_at);
+      td.appendChild(div);
+    });
+    return td;
+  }
+
+  function render(list, accounts) {
+    var byRequest = {};
+    (accounts || []).forEach(function (a) {
+      if (!a.request_id) return;
+      (byRequest[a.request_id] = byRequest[a.request_id] || []).push(a);
+    });
+
     el.rows.textContent = "";
     el.empty.hidden = list.length > 0;
 
@@ -124,10 +158,7 @@
 
       tr.appendChild(cell(row.device_id));
       tr.appendChild(cell(row.installation_id));
-      tr.appendChild(cell(
-        row.telegram_username ? "@" + row.telegram_username
-          : (row.telegram_user_id ? String(row.telegram_user_id) : "")
-      ));
+      tr.appendChild(accountsCell(row, byRequest[row.id] || []));
       tr.appendChild(cell(formatDate(row.created_at)));
       tr.appendChild(cell(formatDate(row.used_at)));
 
@@ -165,9 +196,22 @@
     banner((error && error.message) || "Connection error. Please try again.", true);
   }
 
+  /* Accounts are optional so the page still works before accounts.sql is run. */
+  function listAccounts(pw) {
+    return rpc("admin_list_accounts", { p_password: pw })
+      .catch(function (e) { if (e.unauthorized) throw e; return []; });
+  }
+
+  function fetchAll(pw) {
+    return Promise.all([
+      rpc("admin_list_tokens", { p_password: pw }),
+      listAccounts(pw)
+    ]);
+  }
+
   function load() {
-    return rpc("admin_list_tokens", { p_password: password() })
-      .then(function (data) { render(data || []); })
+    return fetchAll(password())
+      .then(function (r) { render(r[0] || [], r[1] || []); })
       .catch(function (e) { fail(e); throw e; });
   }
 
@@ -192,8 +236,8 @@
     el.unlock.disabled = true;
     setPassword(value);
     // Listing doubles as the password check.
-    rpc("admin_list_tokens", { p_password: value })
-      .then(function (data) { el.unlock.disabled = false; showApp(); render(data || []); })
+    fetchAll(value)
+      .then(function (r) { el.unlock.disabled = false; showApp(); render(r[0] || [], r[1] || []); })
       .catch(function (e) {
         el.unlock.disabled = false;
         setPassword(null);
