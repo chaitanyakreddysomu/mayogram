@@ -212,7 +212,8 @@ public class FileLoader extends BaseController {
     private final ConcurrentHashMap<String, FileUploadOperation> uploadOperationPathsEnc = new ConcurrentHashMap<>();
     private int currentUploadOperationsCount = 0;
     private int currentUploadSmallOperationsCount = 0;
-
+    private volatile boolean isUploadInProgress = false;
+    private FileUploadOperation currentUploadOperation = null;
 
     private final ConcurrentHashMap<String, FileLoadOperation> loadOperationPaths = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LoadOperationUIObject> loadOperationPathsUI = new ConcurrentHashMap<>(10, 1, 2);
@@ -443,6 +444,9 @@ public class FileLoader extends BaseController {
                         } else {
                             uploadOperationPaths.remove(location);
                         }
+                        isUploadInProgress = false;
+                        currentUploadOperation = null;
+                        processNextUpload();
                         if (small) {
                             currentUploadSmallOperationsCount--;
                             if (currentUploadSmallOperationsCount < 1) {
@@ -479,25 +483,10 @@ public class FileLoader extends BaseController {
                         if (delegate != null) {
                             delegate.fileDidFailedUpload(location, encrypted);
                         }
-                        if (small) {
-                            currentUploadSmallOperationsCount--;
-                            if (currentUploadSmallOperationsCount < 1) {
-                                FileUploadOperation operation1 = uploadSmallOperationQueue.poll();
-                                if (operation1 != null) {
-                                    currentUploadSmallOperationsCount++;
-                                    operation1.start();
-                                }
-                            }
-                        } else {
-                            currentUploadOperationsCount--;
-                            if (currentUploadOperationsCount < 1) {
-                                FileUploadOperation operation1 = uploadOperationQueue.poll();
-                                if (operation1 != null) {
-                                    currentUploadOperationsCount++;
-                                    operation1.start();
-                                }
-                            }
-                        }
+                                               // Sequential: Mark done and start next (even on failure)
+                        isUploadInProgress = false;
+                        currentUploadOperation = null;
+                        processNextUpload();
                     });
                 }
 
@@ -508,21 +497,15 @@ public class FileLoader extends BaseController {
                     }
                 }
             });
-            if (small) {
-                if (currentUploadSmallOperationsCount < 1) {
-                    currentUploadSmallOperationsCount++;
-                    operation.start();
-                } else {
-                    uploadSmallOperationQueue.add(operation);
-                }
-            } else {
-                if (currentUploadOperationsCount < 1) {
-                    currentUploadOperationsCount++;
-                    operation.start();
-                } else {
-                    uploadOperationQueue.add(operation);
-                }
-            }
+            // Always add to queue - never start immediately
+        if (small) {
+            uploadSmallOperationQueue.add(operation);
+        } else {
+            uploadOperationQueue.add(operation);
+        }
+
+        // Start sequential processing
+        processNextUpload();
         });
     }
 
@@ -546,6 +529,36 @@ public class FileLoader extends BaseController {
         });
     }
 
+
+        /**
+     * Process uploads one at a time sequentially
+     * Ensures only one file uploads at a time with proper chunk order
+     */
+    private synchronized void processNextUpload() {
+        // If upload already in progress, wait
+        if (isUploadInProgress) {
+            return;
+        }
+        
+        // Get next upload from queue
+        FileUploadOperation nextOperation = null;
+        
+        if (!uploadSmallOperationQueue.isEmpty()) {
+            nextOperation = uploadSmallOperationQueue.poll();
+        } else if (!uploadOperationQueue.isEmpty()) {
+            nextOperation = uploadOperationQueue.poll();
+        }
+        
+        // If no uploads waiting, stop
+        if (nextOperation == null) {
+            return;
+        }
+        
+        // Mark as in progress and start
+        isUploadInProgress = true;
+        currentUploadOperation = nextOperation;
+        nextOperation.start();
+    }
     public void cancelLoadFile(TLRPC.Document document) {
         cancelLoadFile(document, false);
     }
