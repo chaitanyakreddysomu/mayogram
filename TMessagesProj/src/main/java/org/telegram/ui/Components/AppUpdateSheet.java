@@ -4,8 +4,12 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PorterDuff;
+import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -24,20 +28,8 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 
 import java.io.File;
+import java.util.List;
 
-/**
- * Mayogram Telegram-style App Update Sheet.
- *
- * Features:
- * - Telegram light/dark theme support
- * - Rounded top corners
- * - No rectangular background visible around the rounded corners
- * - Subtle glass/frosted appearance
- * - Update checking
- * - Changelog
- * - Download progress
- * - Automatic installation
- */
 public class AppUpdateSheet extends BottomSheet {
 
     private final Activity activity;
@@ -52,9 +44,9 @@ public class AppUpdateSheet extends BottomSheet {
     private final TextView subtitleView;
 
     private final ScrollView changelogScroll;
-    private final TextView changelogView;
+    private final LinearLayout changelogContainer;
 
-    private final TextView button;
+    private final DownloadProgressButton button;
     private final ImageView close;
 
     private AppUpdateController.UpdateInfo info;
@@ -79,18 +71,11 @@ public class AppUpdateSheet extends BottomSheet {
         subtitleView = new TextView(context);
 
         changelogScroll = new ScrollView(context);
-        changelogView = new TextView(context);
+        changelogContainer = new LinearLayout(context);
 
-        button = new TextView(context);
+        button = new DownloadProgressButton(context);
         close = new ImageView(context);
 
-        /*
-         * Do NOT use a black BottomSheet background.
-         *
-         * The root itself will contain the rounded sheet.
-         * This prevents the rectangular background from appearing
-         * outside the rounded top corners.
-         */
         fixNavigationBar(
                 Theme.getColor(
                         Theme.key_windowBackgroundWhite
@@ -98,34 +83,30 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         createView(context);
-
         applyTheme();
 
         setCustomView(root);
 
-        /*
-         * Transparent BottomSheet background.
-         */
         setBackgroundColor(Color.TRANSPARENT);
 
         showChecking();
     }
 
     // ============================================================
-    // CREATE VIEW
+    // CREATE UI
     // ============================================================
 
     private void createView(Context context) {
 
-        /*
-         * Root must remain transparent.
-         */
         root.setBackgroundColor(Color.TRANSPARENT);
 
-        // --------------------------------------------------------
-        // Sheet background
-        // --------------------------------------------------------
-
+        /*
+         * Rounded sheet background.
+         *
+         * Important:
+         * BottomSheet itself stays transparent.
+         * The rounded background belongs to root.
+         */
         GradientDrawable sheetBackground =
                 new GradientDrawable();
 
@@ -133,23 +114,17 @@ public class AppUpdateSheet extends BottomSheet {
                 GradientDrawable.RECTANGLE
         );
 
-        /*
-         * Only the top corners are rounded.
-         *
-         * This is what prevents the "cut rectangle" appearance.
-         */
         sheetBackground.setCornerRadii(
                 new float[]{
-                        dp(24), dp(24),     // top-left
-                        dp(24), dp(24),     // top-right
-                        0, 0,               // bottom-right
-                        0, 0                // bottom-left
+                        dp(24), dp(24),
+                        dp(24), dp(24),
+
+                        0, 0,
+                        0, 0
                 }
         );
 
-        root.setBackground(
-                sheetBackground
-        );
+        root.setBackground(sheetBackground);
 
         // --------------------------------------------------------
         // Main content
@@ -205,7 +180,7 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         // --------------------------------------------------------
-        // Icon container
+        // Icon
         // --------------------------------------------------------
 
         FrameLayout iconFrame =
@@ -219,10 +194,6 @@ public class AppUpdateSheet extends BottomSheet {
                         Gravity.CENTER_HORIZONTAL
                 )
         );
-
-        // --------------------------------------------------------
-        // Icon
-        // --------------------------------------------------------
 
         iconView.setPadding(
                 dp(23),
@@ -243,10 +214,6 @@ public class AppUpdateSheet extends BottomSheet {
                         Gravity.CENTER
                 )
         );
-
-        // --------------------------------------------------------
-        // Progress loader
-        // --------------------------------------------------------
 
         loader.setSize(
                 dp(42)
@@ -289,32 +256,24 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         // --------------------------------------------------------
-        // Changelog
+        // Changelog / Features
         // --------------------------------------------------------
 
-        changelogScroll.setFillViewport(
-                true
-        );
+        changelogScroll.setFillViewport(true);
 
         changelogScroll.setOverScrollMode(
                 View.OVER_SCROLL_IF_CONTENT_SCROLLS
         );
 
-        /*
-         * Remove default ScrollView background.
-         */
         changelogScroll.setBackgroundColor(
                 Color.TRANSPARENT
         );
 
-        changelogView.setTextSize(14);
-
-        changelogView.setLineSpacing(
-                dp(2),
-                1.0f
+        changelogContainer.setOrientation(
+                LinearLayout.VERTICAL
         );
 
-        changelogView.setPadding(
+        changelogContainer.setPadding(
                 dp(14),
                 dp(12),
                 dp(14),
@@ -322,10 +281,10 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         changelogScroll.addView(
-                changelogView,
+                changelogContainer,
                 new ScrollView.LayoutParams(
-                        ScrollView.LayoutParams.MATCH_PARENT,
-                        ScrollView.LayoutParams.WRAP_CONTENT
+                        LayoutParams.MATCH_PARENT,
+                        LayoutParams.WRAP_CONTENT
                 )
         );
 
@@ -342,7 +301,7 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         // --------------------------------------------------------
-        // Action button
+        // Download button
         // --------------------------------------------------------
 
         button.setTextSize(15);
@@ -451,7 +410,7 @@ public class AppUpdateSheet extends BottomSheet {
                 );
 
         // --------------------------------------------------------
-        // Root / sheet
+        // Sheet
         // --------------------------------------------------------
 
         GradientDrawable sheetBackground =
@@ -465,38 +424,30 @@ public class AppUpdateSheet extends BottomSheet {
                 new float[]{
                         dp(24), dp(24),
                         dp(24), dp(24),
+
                         0, 0,
                         0, 0
                 }
         );
 
-        /*
-         * Slightly transparent color in dark mode gives a
-         * softer/frosted appearance while still remaining
-         * readable.
-         */
         if (isDarkTheme()) {
 
-            int darkGlass = blendColor(
-                    backgroundColor,
-                    Color.WHITE,
-                    0.035f
-            );
-
             sheetBackground.setColor(
-                    darkGlass
+                    blendColor(
+                            backgroundColor,
+                            Color.WHITE,
+                            0.035f
+                    )
             );
 
         } else {
 
-            int lightGlass = blendColor(
-                    backgroundColor,
-                    Color.WHITE,
-                    0.35f
-            );
-
             sheetBackground.setColor(
-                    lightGlass
+                    blendColor(
+                            backgroundColor,
+                            Color.WHITE,
+                            0.30f
+                    )
             );
         }
 
@@ -505,43 +456,35 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         // --------------------------------------------------------
-        // Title
+        // Text
         // --------------------------------------------------------
 
         titleView.setTextColor(
                 primaryText
         );
 
-        // --------------------------------------------------------
-        // Subtitle
-        // --------------------------------------------------------
-
         subtitleView.setTextColor(
                 secondaryText
         );
 
         // --------------------------------------------------------
-        // Changelog
+        // Features container
         // --------------------------------------------------------
 
-        changelogView.setTextColor(
-                primaryText
-        );
-
-        GradientDrawable changelogBackground =
+        GradientDrawable featuresBackground =
                 new GradientDrawable();
 
-        changelogBackground.setShape(
+        featuresBackground.setShape(
                 GradientDrawable.RECTANGLE
         );
 
-        changelogBackground.setCornerRadius(
+        featuresBackground.setCornerRadius(
                 dp(12)
         );
 
         if (isDarkTheme()) {
 
-            changelogBackground.setColor(
+            featuresBackground.setColor(
                     blendColor(
                             grayBackground,
                             Color.WHITE,
@@ -551,7 +494,7 @@ public class AppUpdateSheet extends BottomSheet {
 
         } else {
 
-            changelogBackground.setColor(
+            featuresBackground.setColor(
                     blendColor(
                             grayBackground,
                             Color.WHITE,
@@ -561,11 +504,11 @@ public class AppUpdateSheet extends BottomSheet {
         }
 
         changelogScroll.setBackground(
-                changelogBackground
+                featuresBackground
         );
 
         // --------------------------------------------------------
-        // Icon background
+        // Icon
         // --------------------------------------------------------
 
         GradientDrawable iconBackground =
@@ -600,18 +543,10 @@ public class AppUpdateSheet extends BottomSheet {
                 iconBackground
         );
 
-        // --------------------------------------------------------
-        // Icon
-        // --------------------------------------------------------
-
         iconView.setColorFilter(
                 accentColor,
                 PorterDuff.Mode.SRC_IN
         );
-
-        // --------------------------------------------------------
-        // Loader
-        // --------------------------------------------------------
 
         loader.setProgressColor(
                 accentColor
@@ -621,34 +556,20 @@ public class AppUpdateSheet extends BottomSheet {
         // Button
         // --------------------------------------------------------
 
-        GradientDrawable buttonBackground =
-                new GradientDrawable();
-
-        buttonBackground.setShape(
-                GradientDrawable.RECTANGLE
-        );
-
-        buttonBackground.setCornerRadius(
-                dp(12)
-        );
-
-        buttonBackground.setColor(
+        button.setButtonColor(
                 accentColor
         );
 
-        button.setBackground(
-                buttonBackground
+        button.setProgressColor(
+                accentColor
         );
 
-        /*
-         * Telegram blue buttons normally use white text.
-         */
         button.setTextColor(
                 Color.WHITE
         );
 
         // --------------------------------------------------------
-        // Close button
+        // Close
         // --------------------------------------------------------
 
         GradientDrawable closeBackground =
@@ -688,17 +609,10 @@ public class AppUpdateSheet extends BottomSheet {
                 PorterDuff.Mode.SRC_IN
         );
 
-        /*
-         * Navigation bar should follow the current theme.
-         */
         fixNavigationBar(
                 backgroundColor
         );
     }
-
-    // ============================================================
-    // DARK THEME DETECTION
-    // ============================================================
 
     private boolean isDarkTheme() {
 
@@ -707,18 +621,10 @@ public class AppUpdateSheet extends BottomSheet {
                         Theme.key_windowBackgroundWhite
                 );
 
-        int red =
-                Color.red(background);
+        int red = Color.red(background);
+        int green = Color.green(background);
+        int blue = Color.blue(background);
 
-        int green =
-                Color.green(background);
-
-        int blue =
-                Color.blue(background);
-
-        /*
-         * Perceived brightness.
-         */
         double brightness =
                 (0.299 * red)
                         + (0.587 * green)
@@ -726,10 +632,6 @@ public class AppUpdateSheet extends BottomSheet {
 
         return brightness < 128;
     }
-
-    // ============================================================
-    // COLOR BLENDING
-    // ============================================================
 
     private int blendColor(
             int base,
@@ -739,37 +641,31 @@ public class AppUpdateSheet extends BottomSheet {
 
         amount = Math.max(
                 0f,
-                Math.min(
-                        1f,
-                        amount
-                )
+                Math.min(1f, amount)
         );
 
         int r =
                 (int) (
                         Color.red(base)
                                 * (1f - amount)
-                                +
-                                Color.red(overlay)
-                                        * amount
+                                + Color.red(overlay)
+                                * amount
                 );
 
         int g =
                 (int) (
                         Color.green(base)
                                 * (1f - amount)
-                                +
-                                Color.green(overlay)
-                                        * amount
+                                + Color.green(overlay)
+                                * amount
                 );
 
         int b =
                 (int) (
                         Color.blue(base)
                                 * (1f - amount)
-                                +
-                                Color.blue(overlay)
-                                        * amount
+                                + Color.blue(overlay)
+                                * amount
                 );
 
         return Color.rgb(
@@ -788,6 +684,8 @@ public class AppUpdateSheet extends BottomSheet {
         busy = true;
 
         downloaded = null;
+
+        button.resetProgress();
 
         loader.setVisibility(
                 View.VISIBLE
@@ -837,9 +735,7 @@ public class AppUpdateSheet extends BottomSheet {
 
                     } else {
 
-                        showUpdate(
-                                result
-                        );
+                        showUpdate(result);
                     }
                 }
         );
@@ -852,6 +748,8 @@ public class AppUpdateSheet extends BottomSheet {
     private void showError() {
 
         info = null;
+
+        button.resetProgress();
 
         changelogScroll.setVisibility(
                 View.GONE
@@ -866,8 +764,7 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         subtitleView.setText(
-                "Please check your internet connection\n"
-                        + "and try again."
+                "Please check your internet connection\nand try again."
         );
 
         applyIconTint();
@@ -879,12 +776,14 @@ public class AppUpdateSheet extends BottomSheet {
     }
 
     // ============================================================
-    // LATEST VERSION
+    // LATEST
     // ============================================================
 
     private void showLatest() {
 
         info = null;
+
+        button.resetProgress();
 
         changelogScroll.setVisibility(
                 View.GONE
@@ -921,6 +820,8 @@ public class AppUpdateSheet extends BottomSheet {
 
         info = result;
 
+        button.resetProgress();
+
         iconView.setImageResource(
                 R.drawable.msg_download
         );
@@ -930,30 +831,23 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         subtitleView.setText(
-                "Version "
-                        + result.version
+                "Version " + result.version
                         + "\nCurrent version "
                         + BuildVars.BUILD_VERSION_STRING
         );
 
-        if (!TextUtils.isEmpty(
+        /*
+         * Build the What's New section from:
+         *
+         * "features": [
+         *     "OTA Updates",
+         *     "Bug fixes"
+         * ]
+         */
+        buildFeaturesList(
+                result.features,
                 result.changelog
-        )) {
-
-            changelogView.setText(
-                    result.changelog
-            );
-
-            changelogScroll.setVisibility(
-                    View.VISIBLE
-            );
-
-        } else {
-
-            changelogScroll.setVisibility(
-                    View.GONE
-            );
-        }
+        );
 
         applyIconTint();
 
@@ -964,7 +858,255 @@ public class AppUpdateSheet extends BottomSheet {
     }
 
     // ============================================================
-    // SET BUTTON
+    // FEATURES LIST
+    // ============================================================
+
+    private void buildFeaturesList(
+            List<String> features,
+            String changelog
+    ) {
+
+        changelogContainer.removeAllViews();
+
+        boolean hasFeatures =
+                features != null
+                        && !features.isEmpty();
+
+        boolean hasChangelog =
+                !TextUtils.isEmpty(
+                        changelog
+                );
+
+        if (!hasFeatures && !hasChangelog) {
+
+            changelogScroll.setVisibility(
+                    View.GONE
+            );
+
+            return;
+        }
+
+        // --------------------------------------------------------
+        // "What's new" title
+        // --------------------------------------------------------
+
+        TextView heading =
+                new TextView(activity);
+
+        heading.setText(
+                "What's new"
+        );
+
+        heading.setTextSize(14);
+
+        heading.setTypeface(
+                AndroidUtilities.bold()
+        );
+
+        heading.setTextColor(
+                Theme.getColor(
+                        Theme.key_windowBackgroundWhiteBlackText
+                )
+        );
+
+        changelogContainer.addView(
+                heading,
+                LayoutHelper.createLinear(
+                        LayoutHelper.MATCH_PARENT,
+                        LayoutHelper.WRAP_CONTENT,
+                        0,
+                        0,
+                        0,
+                        8
+                )
+        );
+
+        // --------------------------------------------------------
+        // Features
+        // --------------------------------------------------------
+
+        if (hasFeatures) {
+
+            for (String feature : features) {
+
+                if (TextUtils.isEmpty(
+                        feature
+                )) {
+                    continue;
+                }
+
+                addFeature(
+                        feature
+                );
+            }
+        }
+
+        // --------------------------------------------------------
+        // Optional detailed changelog
+        // --------------------------------------------------------
+
+        if (hasChangelog) {
+
+            if (hasFeatures) {
+
+                View divider =
+                        new View(activity);
+
+                divider.setBackgroundColor(
+                        Theme.getColor(
+                                Theme.key_divider
+                        )
+                );
+
+                changelogContainer.addView(
+                        divider,
+                        LayoutHelper.createLinear(
+                                LayoutHelper.MATCH_PARENT,
+                                1,
+                                0,
+                                8,
+                                0,
+                                8
+                        )
+                );
+            }
+
+            TextView details =
+                    new TextView(activity);
+
+            details.setText(
+                    changelog
+            );
+
+            details.setTextSize(14);
+
+            details.setTextColor(
+                    Theme.getColor(
+                            Theme.key_windowBackgroundWhiteBlackText
+                    )
+            );
+
+            details.setLineSpacing(
+                    dp(2),
+                    1.0f
+            );
+
+            changelogContainer.addView(
+                    details,
+                    LayoutHelper.createLinear(
+                            LayoutHelper.MATCH_PARENT,
+                            LayoutHelper.WRAP_CONTENT
+                    )
+            );
+        }
+
+        changelogScroll.setVisibility(
+                View.VISIBLE
+        );
+    }
+
+    // ============================================================
+    // SINGLE FEATURE
+    // ============================================================
+
+    private void addFeature(
+            String feature
+    ) {
+
+        LinearLayout row =
+                new LinearLayout(activity);
+
+        row.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        row.setGravity(
+                Gravity.CENTER_VERTICAL
+        );
+
+        // --------------------------------------------------------
+        // Bullet
+        // --------------------------------------------------------
+
+        TextView bullet =
+                new TextView(activity);
+
+        bullet.setText(
+                "•"
+        );
+
+        bullet.setTextSize(18);
+
+        bullet.setGravity(
+                Gravity.CENTER
+        );
+
+        bullet.setTextColor(
+                Theme.getColor(
+                        Theme.key_windowBackgroundWhiteBlueText
+                )
+        );
+
+        row.addView(
+                bullet,
+                LayoutHelper.createLinear(
+                        20,
+                        LayoutHelper.WRAP_CONTENT
+                )
+        );
+
+        // --------------------------------------------------------
+        // Feature text
+        // --------------------------------------------------------
+
+        TextView text =
+                new TextView(activity);
+
+        text.setText(
+                feature
+        );
+
+        text.setTextSize(14);
+
+        text.setTextColor(
+                Theme.getColor(
+                        Theme.key_windowBackgroundWhiteBlackText
+                )
+        );
+
+        text.setLineSpacing(
+                dp(1),
+                1.0f
+        );
+
+        row.addView(
+                text,
+                LayoutHelper.createLinear(
+                        0,
+                        LayoutHelper.WRAP_CONTENT,
+                        1f,
+                        0,
+                        0,
+                        0,
+                        6
+                )
+        );
+
+        changelogContainer.addView(
+                row,
+                LayoutHelper.createLinear(
+                        LayoutHelper.MATCH_PARENT,
+                        LayoutHelper.WRAP_CONTENT,
+                        0,
+                        0,
+                        0,
+                        5
+                )
+        );
+    }
+
+    // ============================================================
+    // BUTTON
     // ============================================================
 
     private void setButton(
@@ -983,7 +1125,7 @@ public class AppUpdateSheet extends BottomSheet {
         button.setAlpha(
                 enabled
                         ? 1.0f
-                        : 0.5f
+                        : 0.55f
         );
     }
 
@@ -1022,11 +1164,26 @@ public class AppUpdateSheet extends BottomSheet {
             return;
         }
 
-        // --------------------------------------------------------
-        // Start download
-        // --------------------------------------------------------
-
         busy = true;
+
+        button.resetProgress();
+
+        button.setProgress(
+                0
+        );
+
+        int accentColor =
+                Theme.getColor(
+                        Theme.key_windowBackgroundWhiteBlueText
+                );
+
+        button.setButtonColor(
+                accentColor
+        );
+
+        button.setProgressColor(
+                accentColor
+        );
 
         loader.setVisibility(
                 View.VISIBLE
@@ -1041,6 +1198,10 @@ public class AppUpdateSheet extends BottomSheet {
                 false
         );
 
+        // --------------------------------------------------------
+        // Download
+        // --------------------------------------------------------
+
         AppUpdateController.download(
                 info,
                 new AppUpdateController.DownloadCallback() {
@@ -1049,6 +1210,10 @@ public class AppUpdateSheet extends BottomSheet {
                     public void onProgress(
                             int percent
                     ) {
+
+                        button.setProgress(
+                                percent
+                        );
 
                         setButton(
                                 "Downloading… "
@@ -1067,6 +1232,14 @@ public class AppUpdateSheet extends BottomSheet {
 
                         downloaded = file;
 
+                        button.setProgress(
+                                100
+                        );
+
+                        button.setText(
+                                "Installing…"
+                        );
+
                         loader.setVisibility(
                                 View.GONE
                         );
@@ -1075,14 +1248,6 @@ public class AppUpdateSheet extends BottomSheet {
                                 View.VISIBLE
                         );
 
-                        setButton(
-                                "Install",
-                                true
-                        );
-
-                        /*
-                         * Automatically open Android installer.
-                         */
                         AppUpdateController.install(
                                 activity,
                                 file
@@ -1108,6 +1273,8 @@ public class AppUpdateSheet extends BottomSheet {
 
                         applyIconTint();
 
+                        button.resetProgress();
+
                         setButton(
                                 "Download failed — Retry",
                                 true
@@ -1118,7 +1285,7 @@ public class AppUpdateSheet extends BottomSheet {
     }
 
     // ============================================================
-    // ICON TINT
+    // ICON
     // ============================================================
 
     private void applyIconTint() {
@@ -1129,5 +1296,267 @@ public class AppUpdateSheet extends BottomSheet {
                 ),
                 PorterDuff.Mode.SRC_IN
         );
+    }
+
+    // ============================================================
+    // DOWNLOAD PROGRESS BUTTON
+    // ============================================================
+
+    private static class DownloadProgressButton
+            extends TextView {
+
+        private final Paint backgroundPaint =
+                new Paint(
+                        Paint.ANTI_ALIAS_FLAG
+                );
+
+        private final Paint progressPaint =
+                new Paint(
+                        Paint.ANTI_ALIAS_FLAG
+                );
+
+        private final Paint textPaint =
+                new Paint(
+                        Paint.ANTI_ALIAS_FLAG
+                );
+
+        private final RectF rect =
+                new RectF();
+
+        private final Path clipPath =
+                new Path();
+
+        private float progress = 0f;
+
+        private int buttonColor =
+                Color.rgb(
+                        51,
+                        144,
+                        236
+                );
+
+        private int progressColor =
+                Color.rgb(
+                        51,
+                        144,
+                        236
+                );
+
+        private float cornerRadius;
+
+        public DownloadProgressButton(
+                Context context
+        ) {
+
+            super(context);
+
+            setWillNotDraw(false);
+
+            setClickable(true);
+
+            setFocusable(true);
+
+            backgroundPaint.setStyle(
+                    Paint.Style.FILL
+            );
+
+            progressPaint.setStyle(
+                    Paint.Style.FILL
+            );
+
+            textPaint.setAntiAlias(
+                    true
+            );
+
+            textPaint.setTextAlign(
+                    Paint.Align.CENTER
+            );
+
+            setBackgroundColor(
+                    Color.TRANSPARENT
+            );
+        }
+
+        public void setButtonColor(
+                int color
+        ) {
+
+            buttonColor = color;
+
+            invalidate();
+        }
+
+        public void setProgressColor(
+                int color
+        ) {
+
+            progressColor = color;
+
+            invalidate();
+        }
+
+        public void setProgress(
+                float value
+        ) {
+
+            progress =
+                    Math.max(
+                            0f,
+                            Math.min(
+                                    100f,
+                                    value
+                            )
+                    );
+
+            invalidate();
+        }
+
+        public void resetProgress() {
+
+            progress = 0f;
+
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(
+                Canvas canvas
+        ) {
+
+            cornerRadius =
+                    dp(12);
+
+            rect.set(
+                    0,
+                    0,
+                    getWidth(),
+                    getHeight()
+            );
+
+            clipPath.reset();
+
+            clipPath.addRoundRect(
+                    rect,
+                    cornerRadius,
+                    cornerRadius,
+                    Path.Direction.CW
+            );
+
+            int save =
+                    canvas.save();
+
+            canvas.clipPath(
+                    clipPath
+            );
+
+            // ----------------------------------------------------
+            // Base
+            // ----------------------------------------------------
+
+            backgroundPaint.setColor(
+                    buttonColor
+            );
+
+            canvas.drawRect(
+                    0,
+                    0,
+                    getWidth(),
+                    getHeight(),
+                    backgroundPaint
+            );
+
+            // ----------------------------------------------------
+            // Progress
+            // ----------------------------------------------------
+
+            if (progress > 0f) {
+
+                float progressWidth =
+                        getWidth()
+                                * (
+                                progress
+                                        / 100f
+                        );
+
+                progressPaint.setColor(
+                        progressColor
+                );
+
+                canvas.drawRect(
+                        0,
+                        0,
+                        progressWidth,
+                        getHeight(),
+                        progressPaint
+                );
+            }
+
+            canvas.restoreToCount(
+                    save
+            );
+
+            // ----------------------------------------------------
+            // Text
+            // ----------------------------------------------------
+
+            drawCenteredText(
+                    canvas
+            );
+        }
+
+        private void drawCenteredText(
+                Canvas canvas
+        ) {
+
+            CharSequence value =
+                    getText();
+
+            if (value == null) {
+                return;
+            }
+
+            String text =
+                    value.toString();
+
+            if (TextUtils.isEmpty(
+                    text
+            )) {
+                return;
+            }
+
+            textPaint.setColor(
+                    Color.WHITE
+            );
+
+            textPaint.setTextSize(
+                    getTextSize()
+            );
+
+            textPaint.setTypeface(
+                    AndroidUtilities.bold()
+            );
+
+            Paint.FontMetrics metrics =
+                    textPaint.getFontMetrics();
+
+            float x =
+                    getWidth()
+                            / 2f;
+
+            float y =
+                    getHeight()
+                            / 2f
+                            - (
+                            metrics.ascent
+                                    + metrics.descent
+                    ) / 2f;
+
+            canvas.drawText(
+                    text,
+                    x,
+                    y,
+                    textPaint
+            );
+        }
     }
 }
