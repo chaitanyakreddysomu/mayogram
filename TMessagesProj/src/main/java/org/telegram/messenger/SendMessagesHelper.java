@@ -1798,6 +1798,19 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 fparams.suggestionParams = suggestionParams;
                 sendMessage(fparams);
             } else if (messageObject.messageOwner.media.document instanceof TLRPC.TL_document) {
+
+                // UNRESTRICTED: Use direct reference forward (like normal Telegram)
+                if (!DialogObject.isEncryptedDialog(did) && isChannelUnrestricted(messageObject)) {
+                    // Direct reference forward - no download/reupload needed
+                    SendMessagesHelper.SendMessageParams fparams = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_document) messageObject.messageOwner.media.document, null, messageObject.messageOwner.attachPath, did, messageObject.replyMessageObject, null, messageObject.messageOwner.message, messageObject.messageOwner.entities, null, params, true, 0, 0, messageObject.messageOwner.media.ttl_seconds, messageObject, null, false);
+                    fparams.payStars = payStars;
+                    fparams.monoForumPeer = monoForumPeerId;
+                    fparams.suggestionParams = suggestionParams;
+                    sendMessage(fparams);
+                    return;
+                }
+
+
                 if (!DialogObject.isEncryptedDialog(did) && isOwnerCacheReuploadAllowed(messageObject)) {
                     TLRPC.Document doc = messageObject.messageOwner.media.document;
                     if (messageObject.messageOwner.media.ttl_seconds == 0
@@ -1921,6 +1934,25 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     return true;  // ← Change this
 }
     
+
+/**
+ * Returns true if the source channel/chat ALLOWS forwarding (unrestricted)
+ * Unrestricted = can use direct reference forward (like normal Telegram)
+ */
+private boolean isChannelUnrestricted(MessageObject messageObject) {
+    if (messageObject == null || messageObject.messageOwner == null) {
+        return false;
+    }
+    
+    long sourceDialogId = messageObject.getDialogId();
+    if (!DialogObject.isChatDialog(sourceDialogId)) {
+        return false; // Private chats are treated as unrestricted
+    }
+    
+    // Check if channel restricts forwarding
+    boolean isRestricted = MessagesController.getInstance(currentAccount).isPeerNoForwards(sourceDialogId);
+    return !isRestricted; // Return true if NOT restricted (i.e., unrestricted)
+}
     private void showReuploadToast(String text) {
         AndroidUtilities.runOnUIThread(() -> Toast.makeText(ApplicationLoader.applicationContext, text, Toast.LENGTH_SHORT).show());
     }
