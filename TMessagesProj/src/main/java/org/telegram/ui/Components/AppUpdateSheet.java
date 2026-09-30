@@ -324,8 +324,8 @@ public class AppUpdateSheet extends BottomSheet {
         changelogScroll.addView(
                 changelogView,
                 new ScrollView.LayoutParams(
-                        LayoutParams.MATCH_PARENT,
-                        LayoutParams.WRAP_CONTENT
+                        ScrollView.LayoutParams.MATCH_PARENT,
+                        ScrollView.LayoutParams.WRAP_CONTENT
                 )
         );
 
