@@ -304,23 +304,6 @@ public class ChatNotificationsPopupWrapper {
         //  parentFragment.dimBehindView(true);
     }
 
-    public static final String RESTRICTED_KEY_PREFIX = "dialog_restricted_";
-
-    public static boolean isDialogRestricted(long dialogId) {
-        // stored globally (account 0 prefs) — callers that need per-account can adapt
-        android.content.SharedPreferences prefs = org.telegram.messenger.ApplicationLoader.applicationContext
-                .getSharedPreferences("Notifications", android.content.Context.MODE_PRIVATE);
-        return prefs.getBoolean(RESTRICTED_KEY_PREFIX + dialogId, false);
-    }
-
-    public static void setDialogRestricted(long dialogId, boolean restricted) {
-        org.telegram.messenger.ApplicationLoader.applicationContext
-                .getSharedPreferences("Notifications", android.content.Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(RESTRICTED_KEY_PREFIX + dialogId, restricted)
-                .apply();
-    }
-
     public interface Callback {
         default void dismiss() {}
 

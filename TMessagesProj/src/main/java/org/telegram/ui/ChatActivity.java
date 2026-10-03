@@ -4381,12 +4381,8 @@ public class ChatActivity extends BaseFragment implements
 
                     @Override
                     public void toggleRestricted() {
-                        boolean nowRestricted = !ChatNotificationsPopupWrapper.isDialogRestricted(dialog_id);
-                        ChatNotificationsPopupWrapper.setDialogRestricted(dialog_id, nowRestricted);
-                        // Refresh popup state so icon updates immediately on next open
-                        if (chatNotificationsPopupWrapper != null) {
-                            chatNotificationsPopupWrapper.update(dialog_id, getTopicId(), null);
-                        }
+                        boolean nowRestricted = currentChat == null || !currentChat.noforwards;
+                        getMessagesController().toggleChatNoForwards(dialog_id, 0, nowRestricted, (status, error) -> updateRestrictItem());
                     }
                 }, getResourceProvider());
                 muteItem = headerItem.lazilyAddSwipeBackItem(R.drawable.msg_mute, null, null, chatNotificationsPopupWrapper.windowLayout);
@@ -4416,15 +4412,13 @@ public class ChatActivity extends BaseFragment implements
 
                 org.telegram.ui.ActionBar.ActionBarMenuSubItem restrictOnBtn = org.telegram.ui.ActionBar.ActionBarMenuItem.addItem(restrictLayout, R.drawable.msg_block, LocaleController.getString(R.string.RestrictedOn), false, getResourceProvider());
                 restrictOnBtn.setOnClickListener(v -> {
-                    org.telegram.ui.Components.ChatNotificationsPopupWrapper.setDialogRestricted(dialog_id, true);
-                    updateRestrictItem();
+                    getMessagesController().toggleChatNoForwards(dialog_id, 0, true, (status, error) -> updateRestrictItem());
                     headerItem.toggleSubMenu();
                 });
 
                 org.telegram.ui.ActionBar.ActionBarMenuSubItem restrictOffBtn = org.telegram.ui.ActionBar.ActionBarMenuItem.addItem(restrictLayout, R.drawable.msg_cancel, LocaleController.getString(R.string.RestrictedOff), false, getResourceProvider());
                 restrictOffBtn.setOnClickListener(v -> {
-                    org.telegram.ui.Components.ChatNotificationsPopupWrapper.setDialogRestricted(dialog_id, false);
-                    updateRestrictItem();
+                    getMessagesController().toggleChatNoForwards(dialog_id, 0, false, (status, error) -> updateRestrictItem());
                     headerItem.toggleSubMenu();
                 });
 
@@ -16724,7 +16718,7 @@ public class ChatActivity extends BaseFragment implements
 
     private void updateRestrictItem() {
         if (restrictItem == null) return;
-        boolean isRestricted = org.telegram.ui.Components.ChatNotificationsPopupWrapper.isDialogRestricted(dialog_id);
+        boolean isRestricted = currentChat != null && currentChat.noforwards;
         restrictItem.setText(LocaleController.getString(R.string.Restricted) + " · " +
                 LocaleController.getString(isRestricted ? R.string.RestrictedOn : R.string.RestrictedOff));
     }
@@ -22052,6 +22046,7 @@ public class ChatActivity extends BaseFragment implements
                     return;
                 }
                 currentChat = chat;
+                updateRestrictItem();
                 boolean fwdChanged = isPeerNoForwards() != fwdBefore;
                 updateSubtitle = !isThreadChat();
                 updateBottomOverlay();
