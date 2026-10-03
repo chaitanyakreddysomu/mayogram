@@ -5,7 +5,8 @@
   "features": [
     "OTA Updates",
     "Approve All Requests button in member requests screen and bottom sheet",
-    "Restricted toggle in channel 3-dots menu (admins and owners)",
+    "Restricted toggle in channel 3-dots menu for admins and owners",
+    "Restricted toggle calls real Telegram noforwards API (restrict saving content)",
     "Bug fixes"
   ]
 }
