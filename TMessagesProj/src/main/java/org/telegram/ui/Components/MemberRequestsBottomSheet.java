@@ -8,6 +8,9 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 
+import android.widget.FrameLayout;
+import android.view.Gravity;
+
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -17,6 +20,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Delegates.MemberRequestsDelegate;
 import org.telegram.ui.LaunchActivity;
+import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 public class MemberRequestsBottomSheet extends UsersAlertBase {
 
@@ -28,6 +32,7 @@ public class MemberRequestsBottomSheet extends UsersAlertBase {
 
     private float yOffset;
     private boolean enterEventSent;
+    private ButtonWithCounterView approveAllButton;
 
     public MemberRequestsBottomSheet(BaseFragment fragment, long chatId) {
         super(fragment.getParentActivity(), false, fragment.getCurrentAccount(), fragment.getResourceProvider());
@@ -47,10 +52,19 @@ public class MemberRequestsBottomSheet extends UsersAlertBase {
                     if (membersEmptyView.getVisibility() != View.INVISIBLE) {
                         membersEmptyView.setVisibility(View.INVISIBLE);
                     }
+                    if (approveAllButton != null) {
+                        approveAllButton.setVisibility(View.GONE);
+                    }
 //                    dismiss();
                 } else if (fromHide) {
                     searchView.searchEditText.setText("");
+                    if (approveAllButton != null) {
+                        approveAllButton.setVisibility(hasAllImporters() ? View.VISIBLE : View.GONE);
+                    }
                 } else {
+                    if (approveAllButton != null) {
+                        approveAllButton.setVisibility(View.VISIBLE);
+                    }
                     super.onImportersChanged(query, fromCache, fromHide);
                 }
             }
@@ -76,6 +90,21 @@ public class MemberRequestsBottomSheet extends UsersAlertBase {
         containerView.addView(membersSearchEmptyView, position, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
 
         delegate.loadMembers();
+
+        // "Approve All" floating button at the bottom of the sheet
+        approveAllButton = new ButtonWithCounterView(getContext(), fragment.getResourceProvider());
+        approveAllButton.setText(LocaleController.getString(R.string.ApproveAllRequests));
+        approveAllButton.setRound();
+        approveAllButton.setOnClickListener(v -> delegate.approveAll());
+        FrameLayout.LayoutParams approveParams = new FrameLayout.LayoutParams(
+                LayoutHelper.MATCH_PARENT,
+                AndroidUtilities.dp(48),
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL
+        );
+        approveParams.leftMargin = AndroidUtilities.dp(12);
+        approveParams.rightMargin = AndroidUtilities.dp(12);
+        approveParams.bottomMargin = AndroidUtilities.dp(8) + AndroidUtilities.navigationBarHeight;
+        containerView.addView(approveAllButton, approveParams);
     }
 
     @Override

@@ -419,6 +419,16 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
         hideChatJoinRequest(importer, false);
     }
 
+    public void approveAll() {
+        if (allImporters.isEmpty()) {
+            return;
+        }
+        ArrayList<TLRPC.TL_chatInviteImporter> toApprove = new ArrayList<>(allImporters);
+        for (TLRPC.TL_chatInviteImporter importer : toApprove) {
+            hideChatJoinRequest(importer, true);
+        }
+    }
+
     public void setAdapterItemsEnabled(boolean adapterItemsEnabled) {
         if (recyclerView != null) {
             int position = adapter.extraFirstHolders();

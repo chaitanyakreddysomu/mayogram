@@ -496,6 +496,7 @@ public class ChatActivity extends BaseFragment implements
     private ActionBarMenuItem.Item muteItemGap;
     private ActionBarMenuItem.Item feeItemGap;
     private ActionBarMenuItem.Item feeItemText;
+    private ActionBarMenuItem.Item restrictItem;
     private ChatNotificationsPopupWrapper chatNotificationsPopupWrapper;
     // private ChatActivitySideControlsButtonsLayout topButtonsLayout;
     private ChatActivitySideControlsButtonsLayout sideControlsButtonsLayout;
@@ -1692,6 +1693,7 @@ public class ChatActivity extends BaseFragment implements
 
     private final static int chat_menu_topic_create = 73;
     private final static int go_to_top = 75;
+    private final static int restrict = 76;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -4376,6 +4378,16 @@ public class ChatActivity extends BaseFragment implements
                         ChatActivity.this.toggleMute(true);
                         BulletinFactory.createMuteBulletin(ChatActivity.this, getMessagesController().isDialogMuted(dialog_id, getTopicId()), themeDelegate).show();
                     }
+
+                    @Override
+                    public void toggleRestricted() {
+                        boolean nowRestricted = !ChatNotificationsPopupWrapper.isDialogRestricted(dialog_id);
+                        ChatNotificationsPopupWrapper.setDialogRestricted(dialog_id, nowRestricted);
+                        // Refresh popup state so icon updates immediately on next open
+                        if (chatNotificationsPopupWrapper != null) {
+                            chatNotificationsPopupWrapper.update(dialog_id, getTopicId(), null);
+                        }
+                    }
                 }, getResourceProvider());
                 muteItem = headerItem.lazilyAddSwipeBackItem(R.drawable.msg_mute, null, null, chatNotificationsPopupWrapper.windowLayout);
                 muteItem.setOnClickListener(view -> {
@@ -4393,6 +4405,33 @@ public class ChatActivity extends BaseFragment implements
                         muteItem.openSwipeBack();
                     }
                 });
+
+                // Restricted sub-panel with ON / OFF buttons
+                org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout restrictLayout =
+                        new org.telegram.ui.ActionBar.ActionBarPopupWindow.ActionBarPopupWindowLayout(context, R.drawable.popup_fixed_alert, getResourceProvider());
+                restrictLayout.setFitItems(true);
+
+                org.telegram.ui.ActionBar.ActionBarMenuSubItem restrictBack = org.telegram.ui.ActionBar.ActionBarMenuItem.addItem(restrictLayout, R.drawable.msg_arrow_back, LocaleController.getString(R.string.Back), false, getResourceProvider());
+                restrictBack.setOnClickListener(v -> headerItem.getPopupLayout().getSwipeBack().closeForeground());
+
+                org.telegram.ui.ActionBar.ActionBarMenuSubItem restrictOnBtn = org.telegram.ui.ActionBar.ActionBarMenuItem.addItem(restrictLayout, R.drawable.msg_block, LocaleController.getString(R.string.RestrictedOn), false, getResourceProvider());
+                restrictOnBtn.setOnClickListener(v -> {
+                    org.telegram.ui.Components.ChatNotificationsPopupWrapper.setDialogRestricted(dialog_id, true);
+                    updateRestrictItem();
+                    headerItem.toggleSubMenu();
+                });
+
+                org.telegram.ui.ActionBar.ActionBarMenuSubItem restrictOffBtn = org.telegram.ui.ActionBar.ActionBarMenuItem.addItem(restrictLayout, R.drawable.msg_cancel, LocaleController.getString(R.string.RestrictedOff), false, getResourceProvider());
+                restrictOffBtn.setOnClickListener(v -> {
+                    org.telegram.ui.Components.ChatNotificationsPopupWrapper.setDialogRestricted(dialog_id, false);
+                    updateRestrictItem();
+                    headerItem.toggleSubMenu();
+                });
+
+                restrictItem = headerItem.lazilyAddSwipeBackItem(R.drawable.msg_block, null, null, restrictLayout);
+                restrictItem.setOnClickListener(v -> restrictItem.openSwipeBack());
+                updateRestrictItem();
+
                 muteItemGap = headerItem.lazilyAddColoredGap();
             }
             if (currentChat != null) {
@@ -16683,6 +16722,13 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    private void updateRestrictItem() {
+        if (restrictItem == null) return;
+        boolean isRestricted = org.telegram.ui.Components.ChatNotificationsPopupWrapper.isDialogRestricted(dialog_id);
+        restrictItem.setText(LocaleController.getString(R.string.Restricted) + " · " +
+                LocaleController.getString(isRestricted ? R.string.RestrictedOn : R.string.RestrictedOff));
+    }
+
     private void toggleMute(boolean instant) {
         boolean muted = getMessagesController().isDialogMuted(dialog_id, getTopicId());
         if (!muted) {
@@ -28054,6 +28100,10 @@ public class ChatActivity extends BaseFragment implements
                     muteItem.setVisibility(View.VISIBLE);
                     muteItemGap.setVisibility(View.VISIBLE);
                 }
+            }
+            if (restrictItem != null) {
+                boolean canRestrict = currentChat != null && (currentChat.creator || ChatObject.hasAdminRights(currentChat));
+                restrictItem.setVisibility(canRestrict ? View.VISIBLE : View.GONE);
             }
             if (isInsideContainer || forceNoBottom) {
                 bottomChannelButtonsLayout.setVisibility(View.GONE);
