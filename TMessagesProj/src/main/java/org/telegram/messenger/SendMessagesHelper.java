@@ -2033,18 +2033,15 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     if (messageObject == null || messageObject.messageOwner == null) {
         return false;
     }
-    // Remove this restriction check
-    // if (!isForwardOfMediaRestricted(messageObject)) {
-    //     return false;
-    // }
-    
+
     long sourceDialogId = messageObject.getDialogId();
     if (!DialogObject.isChatDialog(sourceDialogId)) {
         return false;
     }
-    
-    // Allow all users (remove creator check)
-    return true;  // ← Change this
+
+    // Only the restricted (noforwards) path needs the per-message cache re-upload;
+    // unrestricted channels must go through the normal batched forward.
+    return MessagesController.getInstance(currentAccount).isPeerNoForwards(sourceDialogId);
 }
     
 
