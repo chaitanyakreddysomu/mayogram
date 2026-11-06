@@ -1,12 +1,14 @@
 {
-  "latestVersion": "1.4.1",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.1/app.apk",
-  "changelog": "v1.4.1 - Restricted toggle now uses real Telegram server API",
+  "latestVersion": "1.4.2",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.2/app.apk",
+  "changelog": "v1.4.2 - Multi-message forward and channel profile photo save fixes",
   "features": [
     "OTA Updates",
     "Approve All Requests button in member requests screen and bottom sheet",
     "Restricted toggle in channel 3-dots menu for admins and owners",
     "Restricted toggle calls real Telegram noforwards API (restrict saving content)",
+    "Fixed: forwarding multiple messages from an unrestricted channel now sends in one normal batch forward instead of one by one",
+    "Fixed: Save to Gallery option for channel profile photo now shows even when the channel is restricted",
     "Bug fixes"
   ]
 }
