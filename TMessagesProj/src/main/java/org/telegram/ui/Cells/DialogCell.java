@@ -3571,7 +3571,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                         ForumUtilities.setMonoForumAvatar(currentAccount, chat, avatarDrawable, avatarImage);
                         avatarDrawable.setScaleSize(1f);
                     } else if (org.telegram.messenger.MayogramBranding.isOfficialChannel(chat)) {
-                        avatarImage.setImageDrawable(org.telegram.messenger.MayogramBranding.getChannelIconDrawable());
+                        avatarImage.setImageBitmap(org.telegram.messenger.MayogramBranding.getChannelIconDrawable());
                     } else {
                         avatarDrawable.setInfo(currentAccount, chat);
                         avatarImage.setForUserOrChat(chat, avatarDrawable);
