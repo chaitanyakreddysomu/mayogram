@@ -11093,8 +11093,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private Drawable getMayogramVerifiedCrossfadeDrawable(int a) {
         if (mayogramVerifiedCrossfadeDrawable[a] == null) {
-            Drawable small = org.telegram.messenger.MayogramBranding.getVerifiedDrawable().getConstantState().newDrawable().mutate();
-            Drawable big = org.telegram.messenger.MayogramBranding.getVerifiedDrawable().getConstantState().newDrawable().mutate();
+            Drawable base = org.telegram.messenger.MayogramBranding.getVerifiedDrawable();
+            if (base == null) {
+                return getVerifiedCrossfadeDrawable(a);
+            }
+            Drawable small = base.getConstantState().newDrawable().mutate();
+            Drawable big = base.getConstantState().newDrawable().mutate();
             mayogramVerifiedCrossfadeDrawable[a] = new CrossfadeDrawable(small, big);
         }
         return mayogramVerifiedCrossfadeDrawable[a];

@@ -41,8 +41,12 @@ public class MayogramBranding {
 
     public static Drawable getVerifiedDrawable() {
         if (verifiedDrawable == null) {
-            verifiedDrawable = ApplicationLoader.applicationContext
-                    .getResources().getDrawable(R.drawable.mayogram_verified).mutate();
+            try {
+                verifiedDrawable = ApplicationLoader.applicationContext
+                        .getResources().getDrawable(R.drawable.mayogram_verified).mutate();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
         }
         return verifiedDrawable;
     }
@@ -51,8 +55,12 @@ public class MayogramBranding {
 
     public static Drawable getChannelIconDrawable() {
         if (channelIconDrawable == null) {
-            channelIconDrawable = ApplicationLoader.applicationContext
-                    .getResources().getDrawable(R.drawable.mayogram_channel_icon).mutate();
+            try {
+                channelIconDrawable = ApplicationLoader.applicationContext
+                        .getResources().getDrawable(R.drawable.mayogram_channel_icon).mutate();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
         }
         return channelIconDrawable;
     }

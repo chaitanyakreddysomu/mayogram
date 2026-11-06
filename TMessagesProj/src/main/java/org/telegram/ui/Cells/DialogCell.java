@@ -4470,8 +4470,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
                     y -= dp(9);
                 }
-                if (drawMayogramVerified) {
-                    android.graphics.drawable.Drawable mayogramBadge = org.telegram.messenger.MayogramBranding.getVerifiedDrawable();
+                android.graphics.drawable.Drawable mayogramBadge = drawMayogramVerified ? org.telegram.messenger.MayogramBranding.getVerifiedDrawable() : null;
+                if (mayogramBadge != null) {
                     setDrawableBounds(mayogramBadge, nameMuteLeft - dp(1), y, Theme.dialogs_verifiedDrawable.getIntrinsicWidth(), Theme.dialogs_verifiedDrawable.getIntrinsicHeight());
                     mayogramBadge.draw(canvas);
                 } else {
