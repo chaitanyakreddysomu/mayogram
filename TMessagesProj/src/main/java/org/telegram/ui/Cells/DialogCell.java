@@ -630,6 +630,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private StaticLayout mentionLayout;
 
     private boolean drawVerified;
+    private boolean drawMayogramVerified;
     private boolean drawBotVerified;
     private boolean drawPremium;
     private final View emojiStatusView;
@@ -1286,6 +1287,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
         drawNameLock = false;
         drawVerified = false;
+        drawMayogramVerified = false;
         drawBotVerified = false;
         drawPremium = false;
         drawForwardIcon = false;
@@ -1487,7 +1489,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                             emojiStatus.set(DialogObject.getEmojiStatusDocumentId(chat.emoji_status), false);
                             emojiStatus.setParticles(DialogObject.isEmojiStatusCollectible(chat.emoji_status), false);
                         } else {
-                            drawVerified = !forbidVerified && chat.verified;
+                            drawMayogramVerified = !forbidVerified && org.telegram.messenger.MayogramBranding.isOfficialChannel(chat);
+                            drawVerified = (!forbidVerified && chat.verified) || drawMayogramVerified;
                             drawBotVerified = !forbidVerified && chat.bot_verification_icon != 0;
                         }
                     } else if (user != null) {
@@ -3567,6 +3570,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     if (chat.monoforum) {
                         ForumUtilities.setMonoForumAvatar(currentAccount, chat, avatarDrawable, avatarImage);
                         avatarDrawable.setScaleSize(1f);
+                    } else if (org.telegram.messenger.MayogramBranding.isOfficialChannel(chat)) {
+                        avatarImage.setImageDrawable(org.telegram.messenger.MayogramBranding.getChannelIconDrawable());
                     } else {
                         avatarDrawable.setInfo(currentAccount, chat);
                         avatarImage.setForUserOrChat(chat, avatarDrawable);
@@ -4465,10 +4470,16 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
                     y -= dp(9);
                 }
-                setDrawableBounds(Theme.dialogs_verifiedDrawable, nameMuteLeft - dp(1), y);
-                setDrawableBounds(Theme.dialogs_verifiedCheckDrawable, nameMuteLeft - dp(1), y);
-                Theme.dialogs_verifiedDrawable.draw(canvas);
-                Theme.dialogs_verifiedCheckDrawable.draw(canvas);
+                if (drawMayogramVerified) {
+                    android.graphics.drawable.Drawable mayogramBadge = org.telegram.messenger.MayogramBranding.getVerifiedDrawable();
+                    setDrawableBounds(mayogramBadge, nameMuteLeft - dp(1), y, Theme.dialogs_verifiedDrawable.getIntrinsicWidth(), Theme.dialogs_verifiedDrawable.getIntrinsicHeight());
+                    mayogramBadge.draw(canvas);
+                } else {
+                    setDrawableBounds(Theme.dialogs_verifiedDrawable, nameMuteLeft - dp(1), y);
+                    setDrawableBounds(Theme.dialogs_verifiedCheckDrawable, nameMuteLeft - dp(1), y);
+                    Theme.dialogs_verifiedDrawable.draw(canvas);
+                    Theme.dialogs_verifiedCheckDrawable.draw(canvas);
+                }
             } else if (drawPremium) {
                 int y = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 12.5f : 15.5f);
                 if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {

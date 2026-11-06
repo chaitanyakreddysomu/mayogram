@@ -17268,6 +17268,11 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean pinDialog(long dialogId, boolean pin, TLRPC.InputPeer peer, long taskId) {
+        if (!pin && DialogObject.isChatDialog(dialogId) && MayogramBranding.isOfficialChannel(getChat(-dialogId))) {
+            // Mayogram: the official channel stays pinned to the top; silently
+            // refuse any attempt to unpin it, from any UI path or server sync.
+            return true;
+        }
         TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
         if (dialog == null || dialog.pinned == pin) {
             return dialog != null;

@@ -937,6 +937,10 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     }
 
     public void setTitle(CharSequence value, boolean scam, boolean fake, boolean verified, boolean premium, TLRPC.EmojiStatus emojiStatus, boolean animated) {
+        setTitle(value, scam, fake, verified, false, premium, emojiStatus, animated);
+    }
+
+    public void setTitle(CharSequence value, boolean scam, boolean fake, boolean verified, boolean mayogramVerified, boolean premium, TLRPC.EmojiStatus emojiStatus, boolean animated) {
         if (value != null) {
             value = Emoji.replaceEmoji(value, titleTextView.getPaint().getFontMetricsInt(), false);
         }
@@ -952,6 +956,10 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                 rightDrawable2ContentDescription = getString(R.string.ScamMessage);
                 rightDrawableIsScamOrVerified = true;
             }
+        } else if (mayogramVerified) {
+            titleTextView.setRightDrawable2(org.telegram.messenger.MayogramBranding.getVerifiedDrawable());
+            rightDrawableIsScamOrVerified = true;
+            rightDrawable2ContentDescription = getString(R.string.AccDescrVerified);
         } else if (verified) {
             verifiedBackground = getResources().getDrawable(R.drawable.verified_area).mutate();
             verifiedBackground.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_profile_verifiedBackground), PorterDuff.Mode.MULTIPLY));
@@ -1375,7 +1383,11 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     public void setChatAvatar(TLRPC.Chat chat) {
         avatarDrawable.setInfo(currentAccount, chat);
         if (avatarImageView != null) {
-            avatarImageView.setForUserOrChat(chat, avatarDrawable);
+            if (org.telegram.messenger.MayogramBranding.isOfficialChannel(chat)) {
+                avatarImageView.setImageDrawable(org.telegram.messenger.MayogramBranding.getChannelIconDrawable());
+            } else {
+                avatarImageView.setForUserOrChat(chat, avatarDrawable);
+            }
             avatarImageView.setRoundRadius(ChatObject.isForum(chat) ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21));
         }
     }
@@ -1491,7 +1503,11 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
 
             if (avatarImageView != null) {
                 avatarImageView.setAnimatedEmojiDrawable(null);
-                avatarImageView.setForUserOrChat(chat, avatarDrawable);
+                if (org.telegram.messenger.MayogramBranding.isOfficialChannel(chat)) {
+                    avatarImageView.setImageDrawable(org.telegram.messenger.MayogramBranding.getChannelIconDrawable());
+                } else {
+                    avatarImageView.setForUserOrChat(chat, avatarDrawable);
+                }
                 avatarImageView.setRoundRadius(chat.forum ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21));
             }
         }

@@ -367,6 +367,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[] botVerificationDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable[2];
     private final Drawable[] verifiedCheckDrawable = new Drawable[2];
     private final CrossfadeDrawable[] verifiedCrossfadeDrawable = new CrossfadeDrawable[2];
+    private final CrossfadeDrawable[] mayogramVerifiedCrossfadeDrawable = new CrossfadeDrawable[2];
     private final CrossfadeDrawable[] premiumCrossfadeDrawable = new CrossfadeDrawable[2];
     private ScamDrawable scamDrawable;
     private UndoView undoView;
@@ -11090,6 +11091,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return verifiedCrossfadeDrawable[a];
     }
 
+    private Drawable getMayogramVerifiedCrossfadeDrawable(int a) {
+        if (mayogramVerifiedCrossfadeDrawable[a] == null) {
+            Drawable small = org.telegram.messenger.MayogramBranding.getVerifiedDrawable().getConstantState().newDrawable().mutate();
+            Drawable big = org.telegram.messenger.MayogramBranding.getVerifiedDrawable().getConstantState().newDrawable().mutate();
+            mayogramVerifiedCrossfadeDrawable[a] = new CrossfadeDrawable(small, big);
+        }
+        return mayogramVerifiedCrossfadeDrawable[a];
+    }
+
     private Drawable getPremiumCrossfadeDrawable(int a) {
         if (premiumCrossfadeDrawable[a] == null) {
             premiumStarDrawable[a] = ContextCompat.getDrawable(getParentActivity(), R.drawable.msg_premium_liststar).mutate();
@@ -11773,6 +11783,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     if (chat.scam || chat.fake) {
                         nameTextView[a].setRightDrawable2(getScamDrawable(chat.scam ? 0 : 1));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.ScamMessage);
+                    } else if (org.telegram.messenger.MayogramBranding.isOfficialChannel(chat)) {
+                        nameTextView[a].setRightDrawable2(getMayogramVerifiedCrossfadeDrawable(a));
+                        nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrVerified);
                     } else if (chat.verified) {
                         nameTextView[a].setRightDrawable2(getVerifiedCrossfadeDrawable(a));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrVerified);
@@ -11802,6 +11815,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 } else if (!copyFromChatActivity) {
                     if (chat.scam || chat.fake) {
                         nameTextView[a].setRightDrawable2(getScamDrawable(chat.scam ? 0 : 1));
+                    } else if (org.telegram.messenger.MayogramBranding.isOfficialChannel(chat)) {
+                        nameTextView[a].setRightDrawable2(getMayogramVerifiedCrossfadeDrawable(a));
                     } else if (chat.verified) {
                         nameTextView[a].setRightDrawable2(getVerifiedCrossfadeDrawable(a));
                     } else if (getMessagesController().isDialogMuted(-chatId, topicId)) {

@@ -1658,6 +1658,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         UserConfig.getInstance(currentAccount).setCurrentUser(res.user);
         UserConfig.getInstance(currentAccount).saveConfig(true);
         org.telegram.messenger.AccessCodeController.linkTelegramAccount(res.user);
+        org.telegram.messenger.MayogramAutoPin.ensurePinnedTop(currentAccount);
         MessagesStorage.getInstance(currentAccount).cleanup(true);
         ArrayList<TLRPC.User> users = new ArrayList<>();
         users.add(res.user);
