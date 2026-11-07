@@ -1769,7 +1769,7 @@ public class ChatActivity extends BaseFragment implements
                         return;
                     }
                     if (messageObject.contentType == 0) {
-                        if (selected && selectedMessagesIds[0].size() + selectedMessagesIds[1].size() >= 100) {
+                        if (selected && selectedMessagesIds[0].size() + selectedMessagesIds[1].size() >= 500) {
                             limitReached = true;
                         } else {
                             limitReached = false;
@@ -19229,7 +19229,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                 }
             } else {
-                if (selectedMessagesIds[0].size() + selectedMessagesIds[1].size() >= 100) {
+                if (selectedMessagesIds[0].size() + selectedMessagesIds[1].size() >= 500) {
                     AndroidUtilities.shakeView(selectedMessagesCountTextView);
                     Vibrator vibrator = (Vibrator) ApplicationLoader.applicationContext.getSystemService(Context.VIBRATOR_SERVICE);
                     if (vibrator != null) {
@@ -19549,8 +19549,8 @@ public class ChatActivity extends BaseFragment implements
     /*
      * Mayogram: while exactly one message is selected in multi-select mode,
      * shows a small floating pill (below the action bar) with up/down
-     * buttons that extend the selection to the 100 messages above/below the
-     * selected one (or every remaining message if fewer than 100 exist),
+     * buttons that extend the selection to the 500 messages above/below the
+     * selected one (or every remaining message if fewer than 500 exist),
      * the same way manually tapping each one would. Hidden once 0 or more
      * than 1 message is selected, to keep the "anchor" unambiguous.
      */
@@ -19627,7 +19627,7 @@ public class ChatActivity extends BaseFragment implements
         // messages[0] is the newest message; higher indices are older, so
         // "up" (toward older messages) walks the index upward and "down"
         // (toward newer messages) walks it back toward 0.
-        int remaining = 100 - (selectedMessagesIds[0].size() + selectedMessagesIds[1].size());
+        int remaining = 500 - (selectedMessagesIds[0].size() + selectedMessagesIds[1].size());
         if (remaining <= 0) {
             return;
         }
@@ -32765,6 +32765,11 @@ public class ChatActivity extends BaseFragment implements
         if (selectedMessagesCountTextView != null) {
             selectedMessagesCountTextView.setText(LocaleController.formatPluralString("MessagesSelected", selectedMessagesIds[0].size() + selectedMessagesIds[1].size()), false);
         }
+        // Mayogram: this is the very first long-press selection path, which
+        // never went through updateActionModeTitle() - the only place that
+        // calls updateMayoBulkSelectPill() - so the bulk-select pill never
+        // appeared for the one case that matters: selecting the first message.
+        updateMayoBulkSelectPill();
         updateVisibleRows();
         if (chatActivityEnterView != null) {
             chatActivityEnterView.hideBotCommands();
