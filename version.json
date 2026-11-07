@@ -1,8 +1,9 @@
 {
-  "latestVersion": "1.4.8",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.8/app.apk",
-  "changelog": "v1.4.8 - Fix logo and pin messages and delete messages",
+  "latestVersion": "1.4.9",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.9/app.apk",
+  "changelog": "v1.4.9 - Center channel-id pill in channel profile, local-only official-channel pinning",
   "features": [
-    "Fix logo and pin messages and delete messages"
+    "Centered channel-id pill below the public/private channel subtitle in the profile screen",
+    "Official-channel auto-pin no longer syncs to the real Telegram account (fixed leak to stock Telegram app)"
   ]
 }
