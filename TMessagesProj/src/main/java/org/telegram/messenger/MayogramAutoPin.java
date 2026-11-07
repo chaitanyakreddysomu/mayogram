@@ -62,8 +62,20 @@ public class MayogramAutoPin {
             final List<OfficialChannel> finalChannels = channels;
             AndroidUtilities.runOnUIThread(() -> {
                 Set<Long> lockedIds = new HashSet<>();
-                for (OfficialChannel channel : finalChannels) {
-                    resolveJoinAndMaybePin(account, channel, lockedIds);
+                // Mayogram: firing contacts.resolveUsername for every channel in
+                // the same tick trips Telegram's flood control on rapid repeated
+                // username resolves, so only the first request (always @mayogram,
+                // sort_order 0) succeeds and the rest fail - this was previously
+                // invisible because errors were swallowed without logging.
+                // Staggering them a few hundred ms apart avoids the flood wait.
+                for (int i = 0; i < finalChannels.size(); i++) {
+                    OfficialChannel channel = finalChannels.get(i);
+                    long delay = i * 400L;
+                    if (delay == 0) {
+                        resolveJoinAndMaybePin(account, channel, lockedIds);
+                    } else {
+                        AndroidUtilities.runOnUIThread(() -> resolveJoinAndMaybePin(account, channel, lockedIds), delay);
+                    }
                 }
             });
         });
@@ -130,11 +142,16 @@ public class MayogramAutoPin {
         TLRPC.TL_contacts_resolveUsername req = new TLRPC.TL_contacts_resolveUsername();
         req.username = channel.username;
         ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
-            if (error != null || !(response instanceof TLRPC.TL_contacts_resolvedPeer)) {
+            if (error != null) {
+                FileLog.e("MayogramAutoPin: resolveUsername failed for @" + channel.username + ": " + error.code + " " + error.text);
+                return;
+            }
+            if (!(response instanceof TLRPC.TL_contacts_resolvedPeer)) {
                 return;
             }
             TLRPC.TL_contacts_resolvedPeer resolved = (TLRPC.TL_contacts_resolvedPeer) response;
             if (resolved.chats.isEmpty()) {
+                FileLog.e("MayogramAutoPin: @" + channel.username + " resolved to no chat (bot/user username?)");
                 return;
             }
             final TLRPC.Chat chat = resolved.chats.get(0);
@@ -169,6 +186,7 @@ public class MayogramAutoPin {
         req.channel = MessagesController.getInputChannel(chat);
         ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
             if (error != null) {
+                FileLog.e("MayogramAutoPin: joinChannel failed for chat " + chat.id + " (@" + chat.username + "): " + error.code + " " + error.text);
                 return;
             }
             AndroidUtilities.runOnUIThread(() -> {
