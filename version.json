@@ -1,9 +1,8 @@
 {
   "latestVersion": "1.4.10",
   "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.10/app.apk",
-  "changelog": "v1.4.10 - Fixed official-channel auto-join/pin for multiple Supabase channels",
+  "changelog": "v1.4.10 - Fixed official channels not joining properly",
   "features": [
-    "Official-channel auto-join now reliably picks up every active channel from Supabase, not just the first one",
-    "Added error logging for channel resolve/join failures to make future issues easier to diagnose"
+    "Fixed an issue where only one official channel would join and pin automatically, now all of them do"
   ]
 }
