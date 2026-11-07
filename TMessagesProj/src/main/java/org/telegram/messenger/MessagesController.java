@@ -21113,9 +21113,10 @@ public class MessagesController extends BaseController implements NotificationCe
                         for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
                             Integer id = arrayList.get(b);
                             MessageObject obj = dialogMessagesByIds.get(id);
-                            if (obj != null) {
-                                obj.mayoDeletedByOther = true;
+                            if (obj != null && obj.messageOwner != null) {
+                                obj.messageOwner.mayoDeletedByOther = true;
                                 long realDialogId = obj.getDialogId();
+                                getMessagesStorage().updateMessageCustomParams(realDialogId, obj.messageOwner);
                                 ArrayList<MessageObject> list = markedByRealDialog.get(realDialogId);
                                 if (list == null) {
                                     list = new ArrayList<>();
@@ -21132,7 +21133,10 @@ public class MessagesController extends BaseController implements NotificationCe
                                 if (obj != null) {
                                     for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
                                         if (obj.getId() == arrayList.get(b)) {
-                                            obj.mayoDeletedByOther = true;
+                                            if (obj.messageOwner != null) {
+                                                obj.messageOwner.mayoDeletedByOther = true;
+                                                getMessagesStorage().updateMessageCustomParams(dialogId, obj.messageOwner);
+                                            }
                                             ArrayList<MessageObject> list = markedByRealDialog.get(dialogId);
                                             if (list == null) {
                                                 list = new ArrayList<>();
