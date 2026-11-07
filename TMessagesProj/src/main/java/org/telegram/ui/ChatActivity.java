@@ -19547,6 +19547,7 @@ public class ChatActivity extends BaseFragment implements
         if (avatarContainer == null) {
             return;
         }
+        avatarContainer.setChannelIdPill(chatMode == 0 ? currentChat : null);
         if (chatMode == MODE_SUGGESTIONS && currentChat != null) {
             if (isSubscriberSuggestions) {
                 avatarContainer.setTitle(ForumUtilities.getMonoForumTitle(currentAccount, currentChat), currentChat.scam, currentChat.fake, currentChat.verified, org.telegram.messenger.MayogramBranding.isOfficialChannel(currentChat), false, null, animated);

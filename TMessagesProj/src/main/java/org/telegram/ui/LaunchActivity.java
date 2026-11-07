@@ -587,6 +587,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             } else {
                 MainTabsActivity mainTabsActivity = new MainTabsActivity();
                 actionBarLayout.addFragmentToStack(mainTabsActivity);
+                if (savedInstanceState == null) {
+                    org.telegram.messenger.MayogramUpdateNotice.maybeShowOnUpdate(currentAccount, this);
+                }
             }
 
             try {

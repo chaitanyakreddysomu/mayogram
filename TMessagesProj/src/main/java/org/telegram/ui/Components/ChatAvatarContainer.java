@@ -85,6 +85,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
     private AtomicReference<SimpleTextView> titleTextLargerCopyView = new AtomicReference<>();
     private SimpleTextView subtitleTextView;
     private AnimatedTextView animatedSubtitleTextView;
+    private android.widget.TextView channelIdPillView;
     private AtomicReference<SimpleTextView> subtitleTextLargerCopyView = new AtomicReference<>();
     private ImageView timeItem;
     private ImageView communityItem;
@@ -684,6 +685,9 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (starFgItem != null) {
             starFgItem.measure(MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(20), MeasureSpec.EXACTLY));
         }
+        if (channelIdPillView != null && channelIdPillView.getVisibility() == VISIBLE) {
+            channelIdPillView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dp(16), MeasureSpec.AT_MOST));
+        }
         setMeasuredDimension(width, MeasureSpec.getSize(heightMeasureSpec));
         if (lastWidth != -1 && lastWidth != width && lastWidth > width) {
             fadeOutToLessWidth(lastWidth);
@@ -805,10 +809,16 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (starFgItem != null) {
             starFgItem.layout(leftPadding + dp(28), viewTop + dp(24), leftPadding + dp(28) + starFgItem.getMeasuredWidth(), viewTop + dp(24) + starFgItem.getMeasuredHeight());
         }
+        int subtitleBottom = subtitleTop;
         if (subtitleTextView != null) {
             subtitleTextView.layout(l, subtitleTop, l + subtitleTextView.getMeasuredWidth(), subtitleTop + subtitleTextView.getTextHeight());
+            subtitleBottom = subtitleTop + subtitleTextView.getTextHeight();
         } else if (animatedSubtitleTextView != null) {
             animatedSubtitleTextView.layout(l, subtitleTop, l + animatedSubtitleTextView.getMeasuredWidth(), subtitleTop + animatedSubtitleTextView.getTextHeight());
+            subtitleBottom = subtitleTop + animatedSubtitleTextView.getTextHeight();
+        }
+        if (channelIdPillView != null && channelIdPillView.getVisibility() == VISIBLE) {
+            channelIdPillView.layout(l, subtitleBottom + dp(1), l + channelIdPillView.getMeasuredWidth(), subtitleBottom + dp(1) + channelIdPillView.getMeasuredHeight());
         }
         SimpleTextView subtitleTextLargerCopyView = this.subtitleTextLargerCopyView.get();
         if (subtitleTextLargerCopyView != null) {
@@ -1015,6 +1025,41 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             lastSubtitle = value;
         }
         checkActionBar(true);
+    }
+
+    /**
+     * Mayogram: small pill below the subtitle showing the channel/supergroup's
+     * numeric id (e.g. -1003472834823), matching how Telegram's Bot API
+     * exposes it. Pass null (or a non-channel chat) to hide it. Conservative,
+     * additive-only change: positioned from the already-laid-out subtitle's
+     * bounds in onLayout rather than touching the container's existing
+     * measure/layout math for every other view.
+     */
+    public void setChannelIdPill(TLRPC.Chat chat) {
+        boolean show = chat != null && ChatObject.isChannel(chat);
+        if (!show) {
+            if (channelIdPillView != null) {
+                channelIdPillView.setVisibility(GONE);
+            }
+            return;
+        }
+        if (channelIdPillView == null) {
+            channelIdPillView = new android.widget.TextView(getContext());
+            channelIdPillView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubtitle));
+            channelIdPillView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 10);
+            channelIdPillView.setSingleLine(true);
+            channelIdPillView.setPadding(dp(6), dp(1), dp(6), dp(1));
+            channelIdPillView.setGravity(Gravity.CENTER);
+            android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
+            pillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            pillBg.setCornerRadius(dp(7));
+            pillBg.setColor((getThemedColor(Theme.key_actionBarDefaultSubtitle) & 0x00FFFFFF) | 0x26000000);
+            channelIdPillView.setBackground(pillBg);
+            addView(channelIdPillView);
+        }
+        channelIdPillView.setText("-100" + chat.id);
+        channelIdPillView.setVisibility(VISIBLE);
+        requestLayout();
     }
 
     public ImageView getTimeItem() {
