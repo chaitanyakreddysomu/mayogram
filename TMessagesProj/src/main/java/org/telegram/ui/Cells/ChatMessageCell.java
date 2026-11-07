@@ -18600,23 +18600,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         } else {
             currentTimeString = timeString;
         }
-        if (currentMessageObject.isMayoDeletedByOther()) {
-            // Mayogram: anti-delete - this message was deleted by the other
-            // side (or a server echo of someone else's deletion) but kept
-            // visible instead of being removed. Prefix a small red trash
-            // icon (not an emoji) onto the time text, same technique used
-            // just below for the diamond/star icons - a ColoredImageSpan
-            // embedded in the time StaticLayout, so it's positioned and
-            // sized correctly in every layout case without needing any
-            // custom canvas drawing.
-            SpannableStringBuilder mayoDeletedSsb = new SpannableStringBuilder("d ");
-            mayoDeletedSsb.append(currentTimeString);
-            ColoredImageSpan mayoTrashSpan = new ColoredImageSpan(R.drawable.msg_delete_filled);
-            mayoTrashSpan.setOverrideColor(getThemedColor(Theme.key_text_RedRegular));
-            mayoTrashSpan.setScale(0.65f, 0.65f);
-            mayoDeletedSsb.setSpan(mayoTrashSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            currentTimeString = mayoDeletedSsb;
-        }
         if (currentMessageObject.isStakedDice()) {
             currentTimeString = TextUtils.concat("💎", StarsIntroActivity.formatTON(currentMessageObject.getStakedDiceAmount()), "  ", currentTimeString);
             currentTimeString = StarsIntroActivity.replaceDiamond(currentTimeString, 0.55f, null, 0, dp(-.33f), 1.05f);
@@ -20279,14 +20262,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (sponosoredAlpha != 255) {
             restoreToSponosoredAlpha = canvas.saveLayerAlpha(0, 0, getMeasuredWidth(), getMeasuredHeight(), sponosoredAlpha);
         }
-        // Mayogram: anti-delete - dim the whole message (bubble, text,
-        // media, time) when it was deleted by the other side but kept
-        // visible, same saveLayerAlpha technique as sponsoredAlpha above.
-        int restoreToMayoDeletedAlpha = -1;
-        if (currentMessageObject.isMayoDeletedByOther()) {
-            restoreToMayoDeletedAlpha = canvas.saveLayerAlpha(0, 0, getMeasuredWidth(), getMeasuredHeight(), (int) (255 * 0.5f));
-        }
-
         setupTextColors();
 
         if (getStarsPriceTopPadding() + suggestionOfferTopPadding + getTopicSeparatorTopPadding() > 0) {
@@ -20486,9 +20461,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         updateSelectionTextPosition();
 
-        if (restoreToMayoDeletedAlpha != -1) {
-            canvas.restoreToCount(restoreToMayoDeletedAlpha);
-        }
         if (restoreToSponosoredAlpha != -1) {
             canvas.restoreToCount(restoreToSponosoredAlpha);
         }

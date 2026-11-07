@@ -10140,18 +10140,6 @@ public class MessageObject {
         return messageOwner.send_state == MESSAGE_SEND_STATE_EDITING && messageOwner.id > 0;
     }
 
-    /**
-     * Mayogram: true when the other side (or a server echo of someone
-     * else's action) deleted this message. Anti-delete keeps it visible
-     * instead of removing it, with a dustbin icon, instead of ever setting
-     * this for the local user's own explicit delete. Persisted via the
-     * normal custom_params column (see MessageCustomParamsHelper), so it
-     * survives app restarts and chat reloads.
-     */
-    public boolean isMayoDeletedByOther() {
-        return messageOwner != null && messageOwner.mayoDeletedByOther;
-    }
-
     public boolean isEditingMedia() {
         if (getMedia(messageOwner) instanceof TLRPC.TL_messageMediaPhoto) {
             return getMedia(messageOwner).photo.id == 0;
