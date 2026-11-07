@@ -1931,8 +1931,13 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             && tryForwardAudioAsNewUpload(messageObject, did, monoForumPeerId, suggestionParams)) {
                         return;
                     }
+                    if (messageObject.messageOwner.media.ttl_seconds == 0
+                            && (MessageObject.isVideoDocument(doc) || MessageObject.isRoundVideoDocument(doc))
+                            && tryForwardVideoAsNewUpload(messageObject, did, monoForumPeerId, suggestionParams)) {
+                        return;
+                    }
                     // Restricted source: a reference-based send would be rejected by the server anyway.
-                    showReuploadToast("Only audio and photo messages can be forwarded from a restricted channel");
+                    showReuploadToast("Only audio, video, and photo messages can be forwarded from a restricted channel");
                     return;
                 }
                 SendMessagesHelper.SendMessageParams fparams = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_document) messageObject.messageOwner.media.document, null, messageObject.messageOwner.attachPath, did, messageObject.replyMessageObject, null, messageObject.messageOwner.message, messageObject.messageOwner.entities, null, params, true, 0, 0, messageObject.messageOwner.media.ttl_seconds, messageObject, null, false);
@@ -2165,6 +2170,109 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
         for (int i = 0; i < srcDoc.attributes.size(); i++) {
             TLRPC.DocumentAttribute attribute = srcDoc.attributes.get(i);
             if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
+                document.attributes.add(attribute);
+            } else if (attribute instanceof TLRPC.TL_documentAttributeFilename) {
+                document.attributes.add(attribute);
+                hasFileName = true;
+            }
+        }
+        if (!hasFileName) {
+            TLRPC.TL_documentAttributeFilename fileNameAttr = new TLRPC.TL_documentAttributeFilename();
+            fileNameAttr.file_name = file.getName();
+            document.attributes.add(fileNameAttr);
+        }
+        final String path = file.getAbsolutePath();
+        final String captionFinal = caption != null ? caption : "";
+        final int jobSeq = markForwardJobAsync();
+        AndroidUtilities.runOnUIThread(() -> {
+            SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(document, null, path, did, null, null, captionFinal, entities, null, null, true, 0, 0, 0, null, null, false);
+            params.monoForumPeer = monoForumPeerId;
+            params.suggestionParams = suggestionParams;
+            sendMessage(params);
+            onForwardJobAsyncDone(jobSeq);
+        });
+    }
+
+    /**
+     * Mayogram: owner-only re-upload of a video (or video-note/round-video) message from the local
+     * file, keeping caption, entities and the video attributes (duration, dimensions, streaming
+     * support, round-message flag). Uses the downloaded file if present; otherwise downloads it
+     * first, then uploads. Mirrors tryForwardAudioAsNewUpload exactly, for video instead of audio.
+     */
+    private boolean tryForwardVideoAsNewUpload(MessageObject messageObject, long did, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        final TLRPC.Document srcDoc = messageObject.getDocument();
+        if (srcDoc == null) {
+            return false;
+        }
+        final String caption = messageObject.messageOwner.message;
+        final ArrayList<TLRPC.MessageEntity> entities = messageObject.messageOwner.entities;
+
+        File local = findCompleteLocalDocument(messageObject, srcDoc);
+        if (local != null) {
+            sendReuploadedVideo(local, srcDoc, did, caption, entities, monoForumPeerId, suggestionParams);
+            return true;
+        }
+
+        final String fileName = FileLoader.getAttachFileName(srcDoc);
+        final String listenerKey = fileName + "_" + did;
+        final int jobSeq = markForwardJobAsync();
+        DownloadController.FileDownloadProgressListener listener = new DownloadController.FileDownloadProgressListener() {
+            private final int tag = getDownloadController().generateObserverTag();
+
+            @Override
+            public void onFailedDownload(String name, boolean canceled) {
+                forwardReuploadListeners.remove(listenerKey);
+                getDownloadController().removeLoadingFileObserver(this);
+                if (!canceled) {
+                    showReuploadToast("Video download failed, not forwarded");
+                }
+                onForwardJobAsyncDone(jobSeq);
+            }
+
+            @Override
+            public void onSuccessDownload(String name) {
+                forwardReuploadListeners.remove(listenerKey);
+                getDownloadController().removeLoadingFileObserver(this);
+                File file = findCompleteLocalDocument(messageObject, srcDoc);
+                if (file != null) {
+                    sendReuploadedVideo(file, srcDoc, did, caption, entities, monoForumPeerId, suggestionParams);
+                } else {
+                    showReuploadToast("Video file incomplete, not forwarded");
+                    onForwardJobAsyncDone(jobSeq);
+                }
+            }
+
+            @Override
+            public void onProgressDownload(String name, long downloadedSize, long totalSize) {
+            }
+
+            @Override
+            public void onProgressUpload(String name, long downloadedSize, long totalSize, boolean isEncrypted) {
+            }
+
+            @Override
+            public int getObserverTag() {
+                return tag;
+            }
+        };
+        forwardReuploadListeners.put(listenerKey, listener);
+        getDownloadController().addLoadingFileObserver(fileName, messageObject, listener);
+        getFileLoader().loadFile(srcDoc, messageObject, FileLoader.PRIORITY_HIGH, 0);
+        return true;
+    }
+
+    private void sendReuploadedVideo(File file, TLRPC.Document srcDoc, long did, String caption, ArrayList<TLRPC.MessageEntity> entities, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        final TLRPC.TL_document document = new TLRPC.TL_document();
+        document.id = 0;
+        document.dc_id = 0;
+        document.file_reference = new byte[0];
+        document.date = getConnectionsManager().getCurrentTime();
+        document.mime_type = TextUtils.isEmpty(srcDoc.mime_type) ? "video/mp4" : srcDoc.mime_type;
+        document.size = file.length();
+        boolean hasFileName = false;
+        for (int i = 0; i < srcDoc.attributes.size(); i++) {
+            TLRPC.DocumentAttribute attribute = srcDoc.attributes.get(i);
+            if (attribute instanceof TLRPC.TL_documentAttributeVideo || attribute instanceof TLRPC.TL_documentAttributeAnimated) {
                 document.attributes.add(attribute);
             } else if (attribute instanceof TLRPC.TL_documentAttributeFilename) {
                 document.attributes.add(attribute);
