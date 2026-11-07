@@ -12087,6 +12087,10 @@ public class MessagesController extends BaseController implements NotificationCe
             message.dialog_id = dialogId;
             final MessageObject messageObject = new MessageObject(currentAccount, message, usersDict, chatsDict, true, false, mode == ChatActivity.MODE_SAVED);
             messageObject.scheduled = mode == 1;
+            if (message.mayoSoftDeleted) {
+                // Mayogram: soft-deleted channel post kept in storage - render it deleted again.
+                messageObject.deleted = true;
+            }
             objects.add(messageObject);
             if (isCache) {
                 if (message.legacy && message.layer < TLRPC.LAYER) {
@@ -17268,7 +17272,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean pinDialog(long dialogId, boolean pin, TLRPC.InputPeer peer, long taskId) {
-        if (!pin && DialogObject.isChatDialog(dialogId) && MayogramBranding.isOfficialChannel(getChat(-dialogId))) {
+        if (!pin && DialogObject.isChatDialog(dialogId) && MayogramBranding.isPinLocked(getChat(-dialogId))) {
             // Mayogram: the official channel stays pinned to the top; silently
             // refuse any attempt to unpin it, from any UI path or server sync.
             return true;

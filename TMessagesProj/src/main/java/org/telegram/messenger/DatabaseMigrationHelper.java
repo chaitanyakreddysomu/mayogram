@@ -1699,6 +1699,13 @@ public class DatabaseMigrationHelper {
             version = 179;
         }
 
+        if (version == 179) {
+            // Mayogram: marks a channel post as soft-deleted instead of physically removed.
+            database.executeFast("CREATE TABLE IF NOT EXISTS mayo_deleted_posts(uid INTEGER, mid INTEGER, PRIMARY KEY(uid, mid));").stepThis().dispose();
+            database.executeFast("PRAGMA user_version = 180").stepThis().dispose();
+            version = 180;
+        }
+
         return version;
     }
 

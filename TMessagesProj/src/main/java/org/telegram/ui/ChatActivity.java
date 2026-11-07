@@ -490,6 +490,7 @@ public class ChatActivity extends BaseFragment implements
     private ArrayList<View> actionModeViews = new ArrayList<>();
     public ChatAvatarContainer avatarContainer;
     private AnimatedTextView selectedMessagesCountTextView;
+    private LinearLayout mayoBulkSelectPill;
     private RecyclerListView.OnItemClickListener mentionsOnItemClickListener;
     private SuggestEmojiView suggestEmojiPanel;
     private ActionBarMenuItem.Item muteItem;
@@ -1253,6 +1254,7 @@ public class ChatActivity extends BaseFragment implements
 
     public final static int OPTION_VIEW_STATISTICS = 115;
     public final static int OPTION_WELCOME_REVERT = 116;
+    public final static int OPTION_MAYO_MESSAGE_OWNER = 117;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -10612,7 +10614,7 @@ public class ChatActivity extends BaseFragment implements
             searchUserButton.setScaleType(ImageView.ScaleType.CENTER);
             searchUserButton.setImageResource(R.drawable.msg_usersearch);
             searchUserButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_searchPanelIcons), PorterDuff.Mode.MULTIPLY));
-            searchUserButton.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_actionBarActionModeDefaultSelector), 1));
+            searchUserButton.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_actionBarActionModeDefaultSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
             searchContainer.addView(searchUserButton, LayoutHelper.createFrame(44, 44, Gravity.LEFT | Gravity.TOP, 48, 0, 0, 0));
             searchUserButton.setOnClickListener(view -> {
                 if (mentionContainer != null) {
@@ -10638,7 +10640,7 @@ public class ChatActivity extends BaseFragment implements
             searchCalendarButton.setScaleType(ImageView.ScaleType.CENTER);
             searchCalendarButton.setImageResource(R.drawable.msg_calendar);
             searchCalendarButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_searchPanelIcons), PorterDuff.Mode.MULTIPLY));
-            searchCalendarButton.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_actionBarActionModeDefaultSelector), 1));
+            searchCalendarButton.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_actionBarActionModeDefaultSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
             searchContainer.addView(searchCalendarButton, LayoutHelper.createFrame(44, 44, Gravity.LEFT | Gravity.TOP, 2.66f, 0, 0, 0));
             searchCalendarButton.setOnClickListener(view -> {
                 if (getParentActivity() == null) {
@@ -19529,6 +19531,7 @@ public class ChatActivity extends BaseFragment implements
             if (selectedMessagesCountTextView != null && (selectedMessagesIds[0].size() != 0 || selectedMessagesIds[1].size() != 0)) {
                 selectedMessagesCountTextView.setText(LocaleController.formatPluralString("MessagesSelected", selectedMessagesIds[0].size() + selectedMessagesIds[1].size()), true);
             }
+            updateMayoBulkSelectPill();
         } else {
             int size = selectedMessagesIds[0].size() + selectedMessagesIds[1].size();
             if (size == 0) {
@@ -19541,6 +19544,122 @@ public class ChatActivity extends BaseFragment implements
                 bottomOverlayChatText.setEnabled(true);
             }
         }
+    }
+
+    /*
+     * Mayogram: while exactly one message is selected in multi-select mode,
+     * shows a small floating pill (below the action bar) with up/down
+     * buttons that extend the selection to the 100 messages above/below the
+     * selected one (or every remaining message if fewer than 100 exist),
+     * the same way manually tapping each one would. Hidden once 0 or more
+     * than 1 message is selected, to keep the "anchor" unambiguous.
+     */
+    private void ensureMayoBulkSelectPill() {
+        if (mayoBulkSelectPill != null || contentView == null) {
+            return;
+        }
+        Context context = contentView.getContext();
+        mayoBulkSelectPill = new LinearLayout(context);
+        mayoBulkSelectPill.setOrientation(LinearLayout.HORIZONTAL);
+        android.graphics.drawable.GradientDrawable pillBg = new android.graphics.drawable.GradientDrawable();
+        pillBg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        pillBg.setCornerRadius(AndroidUtilities.dp(16));
+        pillBg.setColor(getThemedColor(Theme.key_actionBarDefault));
+        mayoBulkSelectPill.setBackground(pillBg);
+        mayoBulkSelectPill.setElevation(AndroidUtilities.dp(2));
+
+        ImageView up = new ImageView(context);
+        up.setScaleType(ImageView.ScaleType.CENTER);
+        up.setImageResource(R.drawable.msg_go_up);
+        up.setColorFilter(new android.graphics.PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultIcon), android.graphics.PorterDuff.Mode.MULTIPLY));
+        up.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_actionBarActionModeDefaultSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
+        up.setOnClickListener(v -> mayoBulkSelectExtend(true));
+        mayoBulkSelectPill.addView(up, LayoutHelper.createLinear(40, 40));
+
+        ImageView down = new ImageView(context);
+        down.setScaleType(ImageView.ScaleType.CENTER);
+        down.setImageResource(R.drawable.msg_go_down);
+        down.setColorFilter(new android.graphics.PorterDuffColorFilter(getThemedColor(Theme.key_actionBarDefaultIcon), android.graphics.PorterDuff.Mode.MULTIPLY));
+        down.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_actionBarActionModeDefaultSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
+        down.setOnClickListener(v -> mayoBulkSelectExtend(false));
+        mayoBulkSelectPill.addView(down, LayoutHelper.createLinear(40, 40));
+
+        contentView.addView(mayoBulkSelectPill, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 40,
+                Gravity.TOP | Gravity.RIGHT, 0, (ActionBar.getCurrentActionBarHeight() + AndroidUtilities.statusBarHeight) / AndroidUtilities.density + 8, 8, 0));
+        mayoBulkSelectPill.setVisibility(View.GONE);
+    }
+
+    private void updateMayoBulkSelectPill() {
+        if (chatMode != MODE_DEFAULT || currentEncryptedChat != null) {
+            if (mayoBulkSelectPill != null) {
+                mayoBulkSelectPill.setVisibility(View.GONE);
+            }
+            return;
+        }
+        int totalSelected = selectedMessagesIds[0].size() + selectedMessagesIds[1].size();
+        if (totalSelected != 1) {
+            if (mayoBulkSelectPill != null) {
+                mayoBulkSelectPill.setVisibility(View.GONE);
+            }
+            return;
+        }
+        ensureMayoBulkSelectPill();
+        if (mayoBulkSelectPill != null) {
+            mayoBulkSelectPill.setVisibility(View.VISIBLE);
+            mayoBulkSelectPill.bringToFront();
+        }
+    }
+
+    private void mayoBulkSelectExtend(boolean up) {
+        MessageObject anchor = null;
+        for (int a = 0; a < selectedMessagesIds.length && anchor == null; a++) {
+            if (selectedMessagesIds[a].size() == 1) {
+                anchor = selectedMessagesIds[a].valueAt(0);
+            }
+        }
+        if (anchor == null) {
+            return;
+        }
+        int anchorIndex = messages.indexOf(anchor);
+        if (anchorIndex < 0) {
+            return;
+        }
+        // messages[0] is the newest message; higher indices are older, so
+        // "up" (toward older messages) walks the index upward and "down"
+        // (toward newer messages) walks it back toward 0.
+        int remaining = 100 - (selectedMessagesIds[0].size() + selectedMessagesIds[1].size());
+        if (remaining <= 0) {
+            return;
+        }
+        int added = 0;
+        if (up) {
+            for (int i = anchorIndex + 1; i < messages.size() && added < remaining; i++) {
+                added += mayoTrySelect(messages.get(i));
+            }
+        } else {
+            for (int i = anchorIndex - 1; i >= 0 && added < remaining; i--) {
+                added += mayoTrySelect(messages.get(i));
+            }
+        }
+        if (added > 0) {
+            updateActionModeTitle();
+            updateVisibleRows();
+        }
+    }
+
+    private int mayoTrySelect(MessageObject messageObject) {
+        if (messageObject == null || messageObject.contentType != 0) {
+            // contentType 0 is a normal selectable message; anything else
+            // (date separators etc.) is not selectable, same gate the
+            // existing multiselect drag logic uses.
+            return 0;
+        }
+        int index = messageObject.getDialogId() == dialog_id ? 0 : 1;
+        if (selectedMessagesIds[index].indexOfKey(messageObject.getId()) >= 0) {
+            return 0;
+        }
+        addToSelectedMessages(messageObject, false);
+        return 1;
     }
 
     public void updateTitle(boolean animated) {
@@ -26384,6 +26503,32 @@ public class ChatActivity extends BaseFragment implements
         } else if (channelId != 0) {
             return;
         }
+
+        // Mayogram: a channel post that was never mine and already had views stays visible
+        // (dimmed, with a red trash icon instead of the views row) rather than disappearing -
+        // its MessageObject is already marked .deleted by MessagesController, so here we just
+        // keep it out of the normal removal logic below and repaint it in place. Secondary
+        // bookkeeping that logic does for a removed message (pinned-message list entry, reply
+        // counts) intentionally does NOT run for these - only the visible-list removal is skipped.
+        if (loadIndex == 0 && ChatObject.isChannel(currentChat) && !DialogObject.isEncryptedDialog(dialog_id)) {
+            boolean mayoHasSoftDeleted = false;
+            for (int mi = markAsDeletedMessages.size() - 1; mi >= 0; mi--) {
+                Integer mid = markAsDeletedMessages.get(mi);
+                MessageObject obj = chatAdapter != null && chatAdapter.isFiltered ? filteredMessagesDict.get(mid) : messagesDict[loadIndex].get(mid);
+                if (obj != null && obj.messageOwner != null && !obj.messageOwner.out && obj.messageOwner.views > 0) {
+                    obj.deleted = true;
+                    markAsDeletedMessages.remove(mi);
+                    mayoHasSoftDeleted = true;
+                }
+            }
+            if (mayoHasSoftDeleted) {
+                invalidateMessagesVisiblePart();
+            }
+            if (markAsDeletedMessages.isEmpty()) {
+                return;
+            }
+        }
+
         if (replyingMessageObject != null && markAsDeletedMessages.contains(replyingMessageObject.getId())) {
             replyingMessageObject = null;
             replyingQuote = null;
@@ -30701,6 +30846,9 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private void hideActionMode() {
+        if (mayoBulkSelectPill != null) {
+            mayoBulkSelectPill.setVisibility(View.GONE);
+        }
         if (actionBar != null) {
             if (!actionBar.isActionModeShowed()) {
                 return;
@@ -34279,6 +34427,13 @@ public class ChatActivity extends BaseFragment implements
             }
             case OPTION_STATISTICS: {
                 presentFragment(new MessageStatisticActivity(selectedObject));
+                break;
+            }
+            case OPTION_MAYO_MESSAGE_OWNER: {
+                boolean canViewPublicForwards = chatInfo != null && chatInfo.can_view_stats
+                        && selectedObject.messageOwner != null && selectedObject.messageOwner.views > 0
+                        && currentChat != null && ChatObject.isChannel(currentChat);
+                org.telegram.ui.Components.MayoMessageOwnerSheet.show(getParentActivity(), ChatActivity.this, selectedObject, canViewPublicForwards, themeDelegate);
                 break;
             }
             case OPTION_SEND_NOW: {
@@ -46026,6 +46181,15 @@ public class ChatActivity extends BaseFragment implements
                     items.add(LocaleController.getString(R.string.CopyLink));
                     options.add(OPTION_COPY_LINK);
                     icons.add(R.drawable.msg_link);
+                }
+                // Mayogram: "who originally posted this" info - only for an
+                // actual forward, or a channel owner/admin checking their own
+                // post's view count. Never claims to list every forwarder.
+                if (!isEphemeral && chatMode == MODE_DEFAULT && (selectedObject.isForwarded()
+                        || (currentChat != null && ChatObject.isChannel(currentChat) && selectedObject.messageOwner != null && selectedObject.messageOwner.views > 0))) {
+                    items.add(LocaleController.getString(R.string.MayoShowMessageOwner));
+                    options.add(OPTION_MAYO_MESSAGE_OWNER);
+                    icons.add(R.drawable.msg_info);
                 }
                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.action == null && currentChat != null && currentChat.forum && !isTopic && selectedObject.messageOwner != null && selectedObject.messageOwner.reply_to != null && selectedObject.messageOwner.reply_to.forum_topic) {
                     items.add(LocaleController.getString(R.string.ViewInTopic));

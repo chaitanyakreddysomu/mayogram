@@ -869,6 +869,13 @@
     <string name="ChooseFromSearch">Search web</string>
     <string name="Statistics">Statistics</string>
     <string name="StatisticsAndBoosts">Statistics and Boosts</string>
+    <string name="MayoShowMessageOwner">Show message owner</string>
+    <string name="MayoMessageOwnerTitle">Message info</string>
+    <string name="MayoOriginallyPostedBy">Originally posted by</string>
+    <string name="MayoOriginalMessageNotForwarded">Not forwarded — this is the original message</string>
+    <string name="MayoSharedWithYouBy">Shared with you by</string>
+    <string name="MayoViewPublicForwards">View public forwards</string>
+    <string name="MayoUnknownSender">Unknown</string>
     <string name="AddBot">Add Bot</string>
     <string name="AddBotAdmin">Add bot as admin</string>
     <string name="AddBotAdminAlert">Add bot as admin?</string>

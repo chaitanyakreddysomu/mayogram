@@ -1840,6 +1840,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     private final boolean ALPHA_PROPERTY_WORKAROUND = Build.VERSION.SDK_INT == 28;
     private float alphaInternal = 1f;
+    // Mayogram: tracks whether THIS view instance currently has our own soft-deleted
+    // dim multiplier applied, so view recycling (RecyclerView reusing this cell for a
+    // different, non-deleted message) correctly removes it without touching any other
+    // alpha animation (enter transitions etc) that may also be driving this same property.
+    private boolean mayoDeletedDimApplied;
+    private static final float MAYO_DELETED_ALPHA_FACTOR = 0.5f;
 
     public final TransitionParams transitionParams = new TransitionParams();
     private boolean edited;
@@ -11326,6 +11332,19 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         highlightCaptionToSetStart = highlightCaptionToSetEnd = -1;
 
         updateFlagSecure();
+
+        // Mayogram: dim the whole cell for a soft-deleted channel post. Multiplicative so it
+        // composes with whatever alpha an unrelated animation (e.g. enter transition) is
+        // already driving, rather than fighting it outright.
+        if (messageObject != null && messageObject.deleted) {
+            if (!mayoDeletedDimApplied) {
+                setAlpha(getAlpha() * MAYO_DELETED_ALPHA_FACTOR);
+                mayoDeletedDimApplied = true;
+            }
+        } else if (mayoDeletedDimApplied) {
+            setAlpha(getAlpha() / MAYO_DELETED_ALPHA_FACTOR);
+            mayoDeletedDimApplied = false;
+        }
     }
 
     public void checkPollFileState() {
@@ -24597,6 +24616,22 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return timeY;
     }
 
+    // Mayogram: cached, red-tinted trash icon drawn in place of the views row for a
+    // soft-deleted message. Lazily created once, reused by every cell (not per-instance).
+    private static Drawable mayoDeletedIconDrawable;
+    private static Drawable getMayoDeletedIconDrawable() {
+        if (mayoDeletedIconDrawable == null) {
+            try {
+                Drawable d = ApplicationLoader.applicationContext.getResources().getDrawable(R.drawable.msg_delete).mutate();
+                d.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_text_RedRegular), PorterDuff.Mode.SRC_IN));
+                mayoDeletedIconDrawable = d;
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        return mayoDeletedIconDrawable;
+    }
+
     private void drawViewsAndRepliesLayout(Canvas canvas, float layoutHeight, float alpha, float timeYOffset, float timeX, float progress, boolean drawSelectionBackground) {
         boolean useScale = progress != 1f;
         float scale = 0.5f + 0.5f * progress;
@@ -24704,6 +24739,27 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             if (transitionParams.animateBackgroundBoundsInner) {
                 viewsX += animationOffsetX;
             }
+            if (currentMessageObject != null && currentMessageObject.deleted) {
+                // Mayogram: soft-deleted post - draw a small red trash icon instead of the
+                // normal views count/icon, same position, skip the views text entirely.
+                Drawable mayoTrash = getMayoDeletedIconDrawable();
+                if (mayoTrash != null) {
+                    float trashSize = Theme.chat_timePaint.getTextSize();
+                    float w = setDrawableBounds(mayoTrash, viewsX, timeY + dp(1.5f), trashSize - dp(2));
+                    if (useScale) {
+                        canvas.save();
+                        canvas.scale(scale, scale, viewsX + w / 2f, mayoTrash.getBounds().centerY());
+                    }
+                    mayoTrash.setAlpha((int) (255 * alpha));
+                    mayoTrash.draw(canvas);
+                    mayoTrash.setAlpha(255);
+                    if (useScale) {
+                        canvas.restore();
+                    }
+                    offsetX += w + dp(6);
+                }
+                transitionParams.lastTimeXViews = viewsX;
+            } else {
             Drawable viewsDrawable;
             if (shouldDrawTimeOnMedia()) {
                 if (currentMessageObject.shouldDrawWithoutBackground()) {
@@ -24752,6 +24808,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 Theme.chat_timePaint.setAlpha(timeAlpha);
             }
             transitionParams.lastTimeXViews = viewsX;
+            }
         }
         if (isPinned || transitionParams.animatePinned) {
             float pinnedX = (transitionParams.shouldAnimateTimeX ? this.timeX : timeX) + offsetX;

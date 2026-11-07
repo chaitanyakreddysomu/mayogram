@@ -12,6 +12,9 @@ import android.graphics.drawable.Drawable;
 
 import org.telegram.tgnet.TLRPC;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class MayogramBranding {
 
     private static final String OFFICIAL_USERNAME = "mayogram";
@@ -35,6 +38,32 @@ public class MayogramBranding {
             }
         }
         return false;
+    }
+
+    /**
+     * Channels from the server-controlled "official channels" list
+     * (supabase/official_channels.sql) that have pin_to_top set - populated
+     * by MayogramAutoPin after each login. @mayogram itself is always
+     * locked, independently of that list, as a safety fallback.
+     */
+    private static volatile Set<Long> lockedChannelIds = Collections.emptySet();
+
+    public static void setLockedChannelIds(Set<Long> ids) {
+        lockedChannelIds = ids != null ? ids : Collections.emptySet();
+    }
+
+    /**
+     * True for a channel that this app pins to the top of the dialog list
+     * and refuses to let the user unpin (see MessagesController.pinDialog).
+     */
+    public static boolean isPinLocked(TLRPC.Chat chat) {
+        if (chat == null) {
+            return false;
+        }
+        if (isOfficialChannel(chat)) {
+            return true;
+        }
+        return lockedChannelIds.contains(chat.id);
     }
 
     private static Drawable verifiedDrawable;

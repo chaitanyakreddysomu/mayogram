@@ -57413,6 +57413,11 @@ public class TLRPC {
 
     //Message start
     public static class Message extends TLObject {
+        // Mayogram: in-memory only (never serialized/deserialized over the wire or to disk),
+        // set by MessagesStorage.getMessagesInternal from the mayo_deleted_posts marker table
+        // when a channel post was soft-deleted. Consumed by MessagesController.processLoadedMessages
+        // to set MessageObject.deleted on load, so it survives a reload from local cache.
+        public boolean mayoSoftDeleted;
         public int id;
         public Peer from_id;
         public int from_boosts_applied;
