@@ -642,6 +642,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int liteModeRow;
     private int stickersRow;
     private int devicesRow;
+    private int mayogramRow;
+    private int supportUsRow;
     private int devicesSectionRow;
     private int helpHeaderRow;
     private int questionRow;
@@ -4588,6 +4590,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 showDialog(builder1.create());
             } else if (position == languageRow) {
                 presentFragment(new LanguageSelectActivity());
+            } else if (position == mayogramRow) {
+                presentFragment(new MayogramInfoActivity());
+            } else if (position == supportUsRow) {
+                Browser.openUrl(getParentActivity(), "https://buymeatea.in/mayogram");
             } else if (position == setUsernameRow) {
                 presentFragment(new ChangeUsernameActivity());
             } else if (position == bioRow) {
@@ -10518,6 +10524,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         liteModeRow = -1;
         stickersRow = -1;
         devicesRow = -1;
+        mayogramRow = -1;
+        supportUsRow = -1;
         devicesSectionRow = -1;
         helpHeaderRow = -1;
         questionRow = -1;
@@ -10685,6 +10693,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 devicesRow = rowCount++;
                 languageRow = rowCount++;
+                mayogramRow = rowCount++;
+                supportUsRow = rowCount++;
                 devicesSectionRow = rowCount++;
                 if (!getMessagesController().premiumFeaturesBlocked()) {
                     premiumRow = rowCount++;
@@ -10705,10 +10715,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (premiumRow >= 0 || starsRow >= 0 || tonRow >= 0 || businessRow >= 0 || premiumGiftingRow >= 0) {
                     premiumSectionsRow = rowCount++;
                 }
-                helpHeaderRow = rowCount++;
-                questionRow = rowCount++;
-                faqRow = rowCount++;
-                policyRow = rowCount++;
+                // Mayogram: Help section (Ask a Question / FAQ / Privacy Policy)
+                // removed - leave helpHeaderRow/questionRow/faqRow/policyRow at
+                // their default -1 so they never match in the adapter below.
                 if (BuildVars.LOGS_ENABLED || BuildVars.DEBUG_PRIVATE_VERSION) {
                     helpSectionCell = rowCount++;
                     debugHeaderRow = rowCount++;
@@ -13911,8 +13920,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         textCell.setColors(-1, Theme.key_text_RedRegular);
                         textCell.setColors(-1, Theme.key_text_RedRegular);
                     } else if (position == languageRow) {
-                        textCell.setTextAndValueAndIcon(LocaleController.getString(R.string.Language), LocaleController.getCurrentLanguageName(), false, R.drawable.msg2_language, false);
+                        textCell.setTextAndValueAndIcon(LocaleController.getString(R.string.Language), LocaleController.getCurrentLanguageName(), false, R.drawable.msg2_language, true);
                         textCell.setImageLeft(23);
+                    } else if (position == mayogramRow) {
+                        textCell.setTextAndIcon("Mayogram", R.drawable.msg2_help, true);
+                    } else if (position == supportUsRow) {
+                        textCell.setTextAndIcon("Support Us ❤️", R.drawable.media_like, false);
                     } else if (position == notificationRow) {
                         textCell.setTextAndIcon(LocaleController.getString(R.string.NotificationsAndSounds), R.drawable.msg2_notifications, true);
                     } else if (position == privacyRow) {
@@ -14366,7 +14379,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         position == clearLogsRow || position == switchBackendRow || position == setAvatarRow ||
                         position == addToGroupButtonRow || position == premiumRow || position == premiumGiftingRow ||
                         position == businessRow || position == liteModeRow || position == birthdayRow || position == channelRow ||
-                        position == starsRow || position == tonRow || position == linkedCommunityRow;
+                        position == starsRow || position == tonRow || position == linkedCommunityRow || position == mayogramRow || position == supportUsRow;
             }
             if (holder.itemView instanceof UserCell) {
                 UserCell userCell = (UserCell) holder.itemView;
@@ -14412,7 +14425,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     position == clearLogsRow || position == switchBackendRow || position == setAvatarRow || position == addToGroupButtonRow ||
                     position == addToContactsRow || position == liteModeRow || position == premiumGiftingRow || position == businessRow ||
                     position == botStarsBalanceRow || position == botTonBalanceRow || position == channelBalanceRow || position == botPermissionLocation ||
-                    position == botPermissionBiometry || position == botPermissionEmojiStatus || position == tonRow
+                    position == botPermissionBiometry || position == botPermissionEmojiStatus || position == tonRow || position == mayogramRow || position == supportUsRow
             ) {
                 return VIEW_TYPE_TEXT;
             } else if (position == notificationsDividerRow) {
@@ -15774,6 +15787,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, filtersRow, sparseIntArray);
             put(++pointer, stickersRow, sparseIntArray);
             put(++pointer, devicesRow, sparseIntArray);
+            put(++pointer, mayogramRow, sparseIntArray);
+            put(++pointer, supportUsRow, sparseIntArray);
             put(++pointer, devicesSectionRow, sparseIntArray);
             put(++pointer, helpHeaderRow, sparseIntArray);
             put(++pointer, questionRow, sparseIntArray);

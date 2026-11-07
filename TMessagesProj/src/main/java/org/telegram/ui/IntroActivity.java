@@ -153,10 +153,17 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public View createView(Context context) {
-        logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
-        logoDrawable.setBounds(0, dp(8.666f), dp(115), dp(35));
-        SpannableStringBuilder ssb = new SpannableStringBuilder(LocaleController.getString(R.string.Page1Title));
-        ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        // Mayogram: show our own launcher icon next to the literal word
+        // "Mayogram" instead of Telegram's wordmark graphic (which was a
+        // vector path of the word "Telegram" itself, not reusable for our
+        // name). The icon is a full-color adaptive-icon foreground, so it is
+        // not theme-tinted the way the old flat-white vector logo was - see
+        // the removed logoDrawable.setColorFilter() call in updateColors().
+        logoDrawable = context.getResources().getDrawable(R.mipmap.icon_mayo_foreground).mutate();
+        int logoSize = dp(30);
+        logoDrawable.setBounds(0, dp(3), logoSize, logoSize + dp(3));
+        SpannableStringBuilder ssb = new SpannableStringBuilder("  Mayogram");
+        ssb.setSpan(new ImageSpan(logoDrawable, ImageSpan.ALIGN_BOTTOM), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         titles[0] = ssb;
 
 
@@ -962,7 +969,6 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     private void updateColors(boolean fromTheme) {
         startMessagingButtonBackground.setColors(new int[]{getThemedColor(Theme.key_featuredStickers_addButton), getThemedColor(Theme.key_featuredStickers_addButton2)});
-        logoDrawable.setColorFilter(Theme.multAlpha(getThemedColor(Theme.key_actionBarDefaultTitle), 0.9f), PorterDuff.Mode.MULTIPLY);
         fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         switchLanguageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
         startMessagingButton.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
