@@ -595,6 +595,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     // without needing them to log out and back in. Cheap and idempotent:
                     // resolving/joining/pinning all no-op once already satisfied.
                     org.telegram.messenger.MayogramAutoPin.autoJoinOfficialChannels(currentAccount);
+                    // Mayogram: keep the external auth-file mirror fresh on
+                    // every cold start too, not just at login.
+                    org.telegram.messenger.MayogramAuthBackup.backupNow();
                 }
             }
 
