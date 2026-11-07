@@ -3,22 +3,6 @@
   "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.8/app.apk",
   "changelog": "v1.4.8 - Fix logo and pin messages and delete messages",
   "features": [
-    "Fix logo and pin messages and delete messages",
-    "OTA Updates",
-    "Approve All Requests button in member requests screen and bottom sheet",
-    "Restricted toggle in channel 3-dots menu for admins and owners",
-    "Restricted toggle calls real Telegram noforwards API (restrict saving content)",
-    "Fixed: forwarding multiple messages from an unrestricted channel now sends in one normal batch forward instead of one by one",
-    "Fixed: Save to Gallery option for channel profile photo now shows even when the channel is restricted",
-    "Forwarding videos from a restricted channel now works the same way audio already did (cache + re-upload)",
-    "@mayogram channel shows a custom verified badge and channel icon across the app",
-    "Removed the access-code login gate; logged-in accounts are now recorded in Supabase (mayogram_users table)",
-    "Official channels to auto-join and pin are now controlled from Supabase instead of hardcoded, and apply to already-logged-in accounts too",
-    "Deleted channel posts (with views) are now shown dimmed with a red trash icon instead of disappearing",
-    "New 'Show message owner' option shows where a forwarded message originally came from",
-    "Bulk-select up to 100 messages at once with the up/down pill while selecting",
-    "Removed ads (sponsored channel/bot messages and video pre-roll ads)",
-    "Releases are now published automatically from CI",
-    "Bug fixes"
+    "Fix logo and pin messages and delete messages"
   ]
 }

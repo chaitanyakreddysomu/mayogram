@@ -5249,6 +5249,22 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
             @Override
             protected void dispatchDraw(Canvas canvas) {
+                // Mayogram: onlineTextView[1] (the "public/private channel" subtitle)
+                // is moved almost entirely via setTranslationX/Y during the header's
+                // expand/collapse animation rather than real layout bounds, so
+                // getLeft()/getBottom() (used in onLayout below) only give its static
+                // pre-translation position. Re-anchor the pill below the subtitle's
+                // real on-screen bottom edge (getY(), which includes translation)
+                // every frame so it stays glued to it instead of drifting to its
+                // static spot. Horizontally it's centered across the whole header
+                // width (not aligned to the subtitle's left edge), sitting between
+                // the subtitle row and the Mute/Search/Share/Edit buttons row below.
+                if (profileChannelIdPillView != null && profileChannelIdPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
+                    float pillX = (getMeasuredWidth() - profileChannelIdPillView.getMeasuredWidth()) / 2f;
+                    float pillY = onlineTextView[1].getY() + onlineTextView[1].getMeasuredHeight() + dp(2);
+                    profileChannelIdPillView.setTranslationX(pillX - profileChannelIdPillView.getLeft());
+                    profileChannelIdPillView.setTranslationY(pillY - profileChannelIdPillView.getTop());
+                }
                 super.dispatchDraw(canvas);
                 if (transitionOnlineText != null) {
                     canvas.save();
@@ -5331,9 +5347,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 super.onLayout(changed, left, top, right, bottom);
                 updateCollectibleHint();
                 if (profileChannelIdPillView != null && profileChannelIdPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
+                    // Mayogram: this just gives the pill a sane static layout box
+                    // (and resets any stale translation from a previous frame) -
+                    // dispatchDraw() above re-anchors it to onlineTextView[1]'s real,
+                    // translated on-screen position every frame.
                     int pillLeft = onlineTextView[1].getLeft();
                     int pillTop = onlineTextView[1].getBottom() + dp(2);
                     profileChannelIdPillView.layout(pillLeft, pillTop, pillLeft + profileChannelIdPillView.getMeasuredWidth(), pillTop + profileChannelIdPillView.getMeasuredHeight());
+                    profileChannelIdPillView.setTranslationX(0);
+                    profileChannelIdPillView.setTranslationY(0);
                 }
             }
         };
