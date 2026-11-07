@@ -356,6 +356,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private String nameTextViewRightDrawableContentDescription = null;
     private String nameTextViewRightDrawable2ContentDescription = null;
     private SimpleTextView[] onlineTextView = new SimpleTextView[4];
+    // Mayogram: small pill below the "public/private channel" subtitle
+    // (onlineTextView[1], the default/collapsed header row - onlineTextView[0]
+    // is the large title overlay shown only while the avatar is pulled down)
+    // showing the channel's numeric id. Positioned manually in
+    // avatarContainer2's onLayout from onlineTextView[1]'s real post-layout
+    // bounds, not a guessed static margin.
+    private TextView profileChannelIdPillView;
     private AudioPlayerAlert.ClippingTextViewSwitcher mediaCounterTextView;
     private RLottieImageView writeButton;
     private AnimatorSet writeButtonAnimation;
@@ -5323,6 +5330,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
                 super.onLayout(changed, left, top, right, bottom);
                 updateCollectibleHint();
+                if (profileChannelIdPillView != null && profileChannelIdPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
+                    int pillLeft = onlineTextView[1].getLeft();
+                    int pillTop = onlineTextView[1].getBottom() + dp(2);
+                    profileChannelIdPillView.layout(pillLeft, pillTop, pillLeft + profileChannelIdPillView.getMeasuredWidth(), pillTop + profileChannelIdPillView.getMeasuredHeight());
+                }
             }
         };
         fallbackImage = new ImageReceiver(avatarContainer2);
@@ -11868,6 +11880,35 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         }
                     } else {
                         onlineTextView[a].setText(a == 0 ? statusString : appendCommunityHiddenRow(profileStatusString));
+                    }
+                }
+                if (a == 1) {
+                    // Mayogram: channel-id pill, directly below this row (the
+                    // same condition already gating the "public/private
+                    // channel" subtitle text set above, so it only shows
+                    // wherever that subtitle itself would).
+                    boolean showIdPill = !isTopic && ChatObject.isChannel(chat);
+                    if (showIdPill) {
+                        if (profileChannelIdPillView == null) {
+                            profileChannelIdPillView = new TextView(getContext());
+                            profileChannelIdPillView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubtitle));
+                            profileChannelIdPillView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
+                            profileChannelIdPillView.setSingleLine(true);
+                            profileChannelIdPillView.setPadding(dp(6), dp(1), dp(6), dp(1));
+                            profileChannelIdPillView.setGravity(Gravity.CENTER);
+                            GradientDrawable pillBg = new GradientDrawable();
+                            pillBg.setShape(GradientDrawable.RECTANGLE);
+                            pillBg.setCornerRadius(dp(7));
+                            pillBg.setColor((getThemedColor(Theme.key_actionBarDefaultSubtitle) & 0x00FFFFFF) | 0x26000000);
+                            profileChannelIdPillView.setBackground(pillBg);
+                            // Placeholder position until avatarContainer2's onLayout
+                            // repositions it from onlineTextView[1]'s real bounds.
+                            avatarContainer2.addView(profileChannelIdPillView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 105, 20, 0, 0));
+                        }
+                        profileChannelIdPillView.setText("-100" + chat.id);
+                        profileChannelIdPillView.setVisibility(View.VISIBLE);
+                    } else if (profileChannelIdPillView != null) {
+                        profileChannelIdPillView.setVisibility(View.GONE);
                     }
                 }
                 if (a == 1 && isTopic) {

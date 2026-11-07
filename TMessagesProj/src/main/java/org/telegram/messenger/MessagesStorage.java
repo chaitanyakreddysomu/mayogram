@@ -14687,12 +14687,12 @@ public class MessagesStorage extends BaseController {
                             data.reuse();
 
                             // Mayogram: soft-delete eligibility - a channel post (not an encrypted
-                            // chat, not sent by me, had at least one view) stays in messages_v2
-                            // instead of being physically deleted, and its downloaded media is kept.
+                            // chat, had at least one view, including ones the current account
+                            // posted itself) stays in messages_v2 instead of being physically
+                            // deleted, and its downloaded media is kept.
                             boolean mayoSoftDelete = !DialogObject.isEncryptedDialog(did)
                                     && DialogObject.isChatDialog(did)
                                     && did != currentUser
-                                    && !message.out
                                     && message.views > 0
                                     && org.telegram.messenger.ChatObject.isChannel(getMessagesController().getChat(-did));
                             if (mayoSoftDelete) {

@@ -199,8 +199,18 @@ public class MayogramAutoPin {
         if (dialog.pinned) {
             return;
         }
-        if (controller.pinDialog(dialogId, true, null, -1)) {
-            controller.reorderPinnedDialogs(dialog.folder_id, null, 0);
-        }
+        // Mayogram: pinDialog(..., taskId = -1) only updates this device's local
+        // dialog list and local DB row - it deliberately skips the
+        // TL_messages_toggleDialogPin network call, so the account's real
+        // Telegram servers never learn this channel got pinned. Do NOT follow
+        // this with reorderPinnedDialogs(): that call always sends
+        // TL_messages_reorderPinnedDialogs with force=true regardless of the
+        // taskId passed to it, which re-syncs the whole pinned-dialog set
+        // (including this channel) to the server - exactly the leak that made
+        // auto-pinned official channels show up pinned when the same account
+        // was opened in stock Telegram. pinDialog() already places the channel
+        // at the top of the local list (pinnedNum = current max + 1), so no
+        // further reorder is needed.
+        controller.pinDialog(dialogId, true, null, -1);
     }
 }

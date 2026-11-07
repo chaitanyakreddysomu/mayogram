@@ -1,8 +1,9 @@
 {
-  "latestVersion": "1.4.7",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.7/app.apk",
-  "changelog": "v1.4.7 - Deleted-message markers, Supabase-driven channel list, message origin info, ad removal",
+  "latestVersion": "1.4.8",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.8/app.apk",
+  "changelog": "v1.4.8 - Fix logo and pin messages and delete messages",
   "features": [
+    "Fix logo and pin messages and delete messages",
     "OTA Updates",
     "Approve All Requests button in member requests screen and bottom sheet",
     "Restricted toggle in channel 3-dots menu for admins and owners",
