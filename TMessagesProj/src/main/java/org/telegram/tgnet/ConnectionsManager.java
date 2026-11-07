@@ -203,31 +203,6 @@ public class ConnectionsManager extends BaseController {
         return localInstance;
     }
 
-    /**
-     * Mayogram: the session file (tgnet.dat - contains the auth key, DC
-     * config and session state) is stored here instead of internal app
-     * storage (ApplicationLoader.getFilesDirFixed()), per explicit request.
-     * This is the LIVE file the native layer reads/writes continuously, not
-     * a backup copy - if this folder is deleted or external storage is
-     * unavailable, the account is logged out and needs to log back in.
-     * Falls back to internal storage only if external storage genuinely
-     * can't be resolved, so the app doesn't outright crash on startup.
-     */
-    private static File getMayogramAuthBaseDir() {
-        try {
-            File external = ApplicationLoader.applicationContext.getExternalFilesDir(null);
-            if (external != null) {
-                File authDir = new File(new File(external, "Mayogram"), "Mayogram Auth");
-                if (authDir.isDirectory() || authDir.mkdirs()) {
-                    return authDir;
-                }
-            }
-        } catch (Exception e) {
-            FileLog.e(e);
-        }
-        return ApplicationLoader.getFilesDirFixed();
-    }
-
     public ConnectionsManager(int instance) {
         super(instance);
         connectionState = native_getConnectionState(currentAccount);
@@ -236,7 +211,7 @@ public class ConnectionsManager extends BaseController {
         String langCode;
         String appVersion;
         String systemVersion;
-        File config = getMayogramAuthBaseDir();
+        File config = ApplicationLoader.getFilesDirFixed();
         if (instance != 0) {
             config = new File(config, "account" + instance);
             config.mkdirs();
