@@ -195,6 +195,11 @@ public static VideoAds make(
     private void load() {
         if (loading || loaded) return;
 
+        // Mayogram: ads removed entirely, regardless of premium status.
+        if (true) {
+            return;
+        }
+
         if (UserConfig.getInstance(currentAccount).isPremium() && MessagesController.getInstance(currentAccount).isSponsoredDisabled()) {
             return;
         }
