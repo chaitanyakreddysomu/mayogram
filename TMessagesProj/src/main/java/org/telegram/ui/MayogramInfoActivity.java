@@ -59,30 +59,7 @@ public class MayogramInfoActivity extends UniversalFragment {
         supportRow = items.size();
         items.add(UItem.asButton(BUTTON_SUPPORT, R.drawable.media_like, "Support Us ❤️", SUPPORT_URL));
         items.add(UItem.asShadow(null));
-
-        items.add(UItem.asHeader("FEATURES"));
-        for (String feature : FEATURES) {
-            items.add(UItem.asButton(0, R.drawable.msg_check_s, feature));
-        }
-        items.add(UItem.asShadow(null));
     }
-
-    // Mayogram: plain-language list of what this fork adds over stock
-    // Telegram, shown here so users can see it without reading a changelog.
-    // Keep this in sync with what's actually shipped - update it whenever a
-    // feature is added, changed, or removed.
-    private static final String[] FEATURES = {
-            "Official @mayogram channel joins and pins itself to the top automatically",
-            "Select up to 500 messages at once, with quick jump-up/jump-down buttons",
-            "Live transfer speed shown while sending or downloading music",
-            "Progress bar when forwarding many messages at once",
-            "A banner in your chat list whenever a new update is available",
-            "Music and voice messages resume right where you paused them",
-            "Scheduled Messages screen - see every chat with scheduled messages in one place",
-            "Select every channel you manage with one tap, then forward to all of them at once",
-            "See who originally posted a forwarded message or channel post",
-            "The channel's numeric ID is shown on its profile page",
-    };
 
     private View createHeaderView(Context context) {
         LinearLayout layout = new LinearLayout(context);
