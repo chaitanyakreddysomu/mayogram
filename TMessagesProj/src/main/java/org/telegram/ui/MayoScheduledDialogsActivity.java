@@ -87,6 +87,17 @@ public class MayoScheduledDialogsActivity extends BaseFragment {
         return fragmentView;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Mayogram: this screen's data is a snapshot taken when it was
+        // created. Deleting/sending a scheduled message happens in a child
+        // ChatActivity pushed on top, so reload whenever this screen becomes
+        // visible again (including just coming back from that child), not
+        // only the first time it's built.
+        load();
+    }
+
     private void openScheduledForDialog(long dialogId) {
         if (getParentActivity() == null) {
             return;
