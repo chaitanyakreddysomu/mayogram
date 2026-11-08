@@ -801,6 +801,7 @@ public class ChatActivity extends BaseFragment implements
     private java.util.HashSet<Long> mayoForwardProgressDialogIds;
     private int mayoForwardProgressTotal;
     private int mayoForwardProgressSent;
+    private int mayoForwardLastCountedMessageId;
     private ArrayList<MessageObject> mayoForwardQueue;
     private int mayoForwardQueueNextIndex;
     private int mayoForwardPendingCount;
@@ -14449,6 +14450,7 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressDialogIds = new java.util.HashSet<>(dialogIds);
         mayoForwardProgressTotal = total;
         mayoForwardProgressSent = 0;
+        mayoForwardLastCountedMessageId = 0;
         mayoShowForwardProgressBar();
     }
 
@@ -14514,14 +14516,28 @@ public class ChatActivity extends BaseFragment implements
      * the "sent" count. mayoForwardPendingCount is how many confirmations
      * this operation is actually still waiting on (1, with chunk size 1);
      * only decrement/count while that's > 0, and ignore anything else.
+     *
+     * SendMessagesHelper also posts this notification TWICE per message
+     * that's actually sent (once right after the server accepts it, again
+     * after the local DB write finishes) - the second one used to land
+     * after mayoSendNextForwardChunk() had already reset
+     * mayoForwardPendingCount to 1 for the *next* message, so it got
+     * wrongly counted as that next message's delivery and the whole queue
+     * raced ahead 2 messages per 1 real one. newMessageId dedupes against
+     * that: a repeat of the same server message id is always a duplicate,
+     * however mayoForwardPendingCount looks at the time it arrives.
      */
-    private void mayoOnForwardMessageDelivered(long dialogId) {
+    private void mayoOnForwardMessageDelivered(long dialogId, int newMessageId) {
         if (mayoForwardProgressDialogIds == null || !mayoForwardProgressDialogIds.contains(dialogId) || mayoForwardProgressBar == null) {
+            return;
+        }
+        if (newMessageId != 0 && newMessageId == mayoForwardLastCountedMessageId) {
             return;
         }
         if (mayoForwardPendingCount <= 0) {
             return;
         }
+        mayoForwardLastCountedMessageId = newMessageId;
         mayoForwardPendingCount--;
         mayoForwardProgressSent = Math.min(mayoForwardProgressSent + 1, mayoForwardProgressTotal);
         if (mayoForwardProgressTextView != null) {
@@ -22697,7 +22713,7 @@ public class ChatActivity extends BaseFragment implements
             processDeletedMessages(markAsDeletedMessages, 0, false);
         } else if (id == NotificationCenter.messageReceivedByServer) {
             if (mayoForwardProgressDialogIds != null && args[3] instanceof Long) {
-                mayoOnForwardMessageDelivered((Long) args[3]);
+                mayoOnForwardMessageDelivered((Long) args[3], args[1] instanceof Integer ? (Integer) args[1] : 0);
             }
             Boolean scheduled = (Boolean) args[6];
             if (scheduled != (chatMode == MODE_SCHEDULED)) {
