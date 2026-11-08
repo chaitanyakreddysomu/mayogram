@@ -18589,15 +18589,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (currentMessageObject.messageOwner.video_processing_pending) {
             timeString = formatString(R.string.ScheduledTimeApprox, timeString);
         }
-        if (currentMessageObject.mayoDeletedByOther) {
-            // Mayogram: anti-delete - this message was deleted by the other
-            // side (or a server echo of someone else's deletion) but kept
-            // visible instead of being removed; prefix the dustbin emoji
-            // onto the existing time string so it's obvious at a glance,
-            // reusing the normal time-layout/measurement path rather than
-            // hand-rolling a separate badge.
-            timeString = "🗑 " + timeString;
-        }
         if (signString != null) {
             if (messageObject.messageOwner.via_business_bot_id != 0) {
                 currentTimeString = timeString + ", ";

@@ -747,10 +747,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         if (items.get(items.size() - 1).viewType != UniversalAdapter.VIEW_TYPE_SHADOW)
             items.add(UItem.asShadow(null));
 
-        // Mayogram: Help section (Ask a Question / FAQ / Features / Privacy
-        // Policy) removed - replaced with Mayogram + Support Us rows below.
-        items.add(SettingCell.Factory.of(25, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_channel, "Mayogram"));
-        items.add(SettingCell.Factory.of(26, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_gift, "Support Us ❤️"));
+        items.add(UItem.asHeader(getString(R.string.SettingsHelp)));
+        items.add(SettingCell.Factory.of(17, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_ask, getString(R.string.AskAQuestion)));
+        items.add(SettingCell.Factory.of(18, IconBackgroundColors.BLUE_LIGHT.top, IconBackgroundColors.BLUE_LIGHT.bottom, R.drawable.settings_faq, getString(R.string.TelegramFAQ)));
+        items.add(SettingCell.Factory.of(23, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_features, getString(R.string.TelegramFeatures)));
+        items.add(SettingCell.Factory.of(19, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_policy, getString(R.string.PrivacyPolicy)));
 
         if (SharedSettings.experimentalSettingsAllowed.get()) {
             items.add(UItem.asShadow(null));
@@ -899,11 +900,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 UserSelectorBottomSheet.open(0, BirthdayController.getInstance(UserConfig.selectedAccount).getState());
                 break;
 
-            case 25:
-                presentSettingFragment(new MayogramInfoActivity());
+            case 17:
+                showDialog(AlertsCreator.createSupportAlert(this, resourceProvider));
                 break;
-            case 26:
-                Browser.openUrl(getContext(), "https://buymeatea.in/mayogram");
+            case 18:
+                Browser.openUrl(getParentActivity(), LocaleController.getString(R.string.TelegramFaqUrl));
+                break;
+            case 19:
+                Browser.openUrl(getParentActivity(), LocaleController.getString(R.string.PrivacyPolicyUrl));
                 break;
 
             case 20:

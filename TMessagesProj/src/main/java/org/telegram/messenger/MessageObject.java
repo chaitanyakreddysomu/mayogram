@@ -224,11 +224,6 @@ public class MessageObject {
     public String monthKey;
     public boolean deleted;
     public boolean deletedByThanos;
-    // Mayogram: set when the other side (or server echo of someone else's
-    // action) deletes this message - anti-delete keeps it visible instead
-    // of removing it, with a small dustbin icon so it's clear it happened.
-    // Never set for the local user's own explicit delete.
-    public boolean mayoDeletedByOther;
     public float audioProgress;
     public float forceSeekTo = -1;
     public int audioProgressMs;
