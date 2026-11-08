@@ -1,8 +1,11 @@
 {
-  "latestVersion": "1.4.19",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.19/app.apk",
-  "changelog": "v1.4.19 - Fixed channel delete bug",
+  "latestVersion": "1.4.20",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.20/app.apk",
+  "changelog": "v1.4.20 - Forward progress, Scheduled Messages screen, select-all-channels, features list",
   "features": [
-    "Fixed: deleted channel posts now disappear right away instead of staying until you reopen the chat"
+    "Progress bar when forwarding many messages at once",
+    "New Scheduled Messages screen showing every chat with scheduled messages",
+    "Select every channel you manage with one tap when forwarding",
+    "Features list added to the Mayogram info screen"
   ]
 }
