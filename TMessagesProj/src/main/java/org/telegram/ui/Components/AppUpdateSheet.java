@@ -55,6 +55,23 @@ public class AppUpdateSheet extends BottomSheet {
 
     private boolean busy;
 
+    private final AppUpdateController.DownloadCallback downloadCallback = new AppUpdateController.DownloadCallback() {
+        @Override
+        public void onProgress(int percent) {
+            onDownloadProgress(percent);
+        }
+
+        @Override
+        public void onDone(File file) {
+            onDownloadDone(file);
+        }
+
+        @Override
+        public void onError() {
+            onDownloadError();
+        }
+    };
+
     public AppUpdateSheet(Activity activity) {
         super(activity, false);
 
@@ -823,10 +840,6 @@ public class AppUpdateSheet extends BottomSheet {
 
         button.resetProgress();
 
-        iconView.setImageResource(
-                R.drawable.msg_download
-        );
-
         titleView.setText(
                 "Update available"
         );
@@ -852,10 +865,55 @@ public class AppUpdateSheet extends BottomSheet {
 
         applyIconTint();
 
-        setButton(
-                "Download & Install",
-                true
-        );
+        if (AppUpdateController.isDownloaded(result.version)) {
+
+            // Already fully downloaded in a previous session/sheet - skip
+            // straight to install, never re-download.
+            downloaded = AppUpdateController.getDownloadedFile(result.version);
+
+            iconView.setImageResource(
+                    R.drawable.msg_download
+            );
+
+            setButton(
+                    "Install",
+                    true
+            );
+
+        } else if (AppUpdateController.isDownloading(result.version)) {
+
+            // A download kicked off from an earlier sheet (or before this one
+            // was reopened) is still running in the background - attach to
+            // it and show its real progress instead of restarting at 0%.
+            downloaded = null;
+            busy = true;
+
+            int accentColor = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText);
+            button.setButtonColor(accentColor);
+            button.setProgressColor(accentColor);
+
+            loader.setVisibility(View.VISIBLE);
+            iconView.setVisibility(View.INVISIBLE);
+
+            int percent = AppUpdateController.getDownloadPercent();
+            button.setProgress(percent);
+            setButton("Downloading… " + percent + "%", false);
+
+            AppUpdateController.download(result, downloadCallback);
+
+        } else {
+
+            downloaded = null;
+
+            iconView.setImageResource(
+                    R.drawable.msg_download
+            );
+
+            setButton(
+                    "Download & Install",
+                    true
+            );
+        }
     }
 
     // ============================================================
@@ -1200,89 +1258,105 @@ public class AppUpdateSheet extends BottomSheet {
         );
 
         // --------------------------------------------------------
-        // Download
+        // Download (continues in the background even if this sheet
+        // is dismissed - see downloadCallback/onDownload* below).
         // --------------------------------------------------------
 
         AppUpdateController.download(
                 info,
-                new AppUpdateController.DownloadCallback() {
-
-                    @Override
-                    public void onProgress(
-                            int percent
-                    ) {
-
-                        button.setProgress(
-                                percent
-                        );
-
-                        setButton(
-                                "Downloading… "
-                                        + percent
-                                        + "%",
-                                false
-                        );
-                    }
-
-                    @Override
-                    public void onDone(
-                            File file
-                    ) {
-
-                        busy = false;
-
-                        downloaded = file;
-
-                        button.setProgress(
-                                100
-                        );
-
-                        button.setText(
-                                "Installing…"
-                        );
-
-                        loader.setVisibility(
-                                View.GONE
-                        );
-
-                        iconView.setVisibility(
-                                View.VISIBLE
-                        );
-
-                        AppUpdateController.install(
-                                activity,
-                                file
-                        );
-                    }
-
-                    @Override
-                    public void onError() {
-
-                        busy = false;
-
-                        loader.setVisibility(
-                                View.GONE
-                        );
-
-                        iconView.setVisibility(
-                                View.VISIBLE
-                        );
-
-                        iconView.setImageResource(
-                                R.drawable.msg_retry
-                        );
-
-                        applyIconTint();
-
-                        button.resetProgress();
-
-                        setButton(
-                                "Download failed — Retry",
-                                true
-                        );
-                    }
-                }
+                downloadCallback
         );
+    }
+
+    // ============================================================
+    // DOWNLOAD CALLBACKS
+    // ============================================================
+    //
+    // Split out from onButtonClick so the same callback instance can be
+    // (re)attached from showUpdate() when this sheet is reopened onto an
+    // already-running or already-finished background download, not just
+    // when the user just pressed the button.
+
+    private void onDownloadProgress(int percent) {
+
+        busy = true;
+
+        button.setProgress(
+                percent
+        );
+
+        setButton(
+                "Downloading… "
+                        + percent
+                        + "%",
+                false
+        );
+    }
+
+    private void onDownloadDone(File file) {
+
+        busy = false;
+
+        downloaded = file;
+
+        button.setProgress(
+                100
+        );
+
+        button.setText(
+                "Install"
+        );
+
+        button.setEnabled(true);
+        button.setAlpha(1.0f);
+
+        loader.setVisibility(
+                View.GONE
+        );
+
+        iconView.setVisibility(
+                View.VISIBLE
+        );
+    }
+
+    private void onDownloadError() {
+
+        busy = false;
+
+        loader.setVisibility(
+                View.GONE
+        );
+
+        iconView.setVisibility(
+                View.VISIBLE
+        );
+
+        iconView.setImageResource(
+                R.drawable.msg_retry
+        );
+
+        applyIconTint();
+
+        button.resetProgress();
+
+        setButton(
+                "Download failed — Retry",
+                true
+        );
+    }
+
+    // ============================================================
+    // DISMISS
+    // ============================================================
+    //
+    // Only detaches this sheet's UI callback - the download itself (held by
+    // AppUpdateController as static/background state) keeps running so it
+    // finishes even with the sheet closed.
+
+    @Override
+    public void dismiss() {
+        AppUpdateController.removeListener(downloadCallback);
+        super.dismiss();
     }
 
     // ============================================================

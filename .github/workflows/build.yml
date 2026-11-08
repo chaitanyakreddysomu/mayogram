@@ -76,7 +76,26 @@ jobs:
           done
           exit 1
 
+      # Downloads the Temurin JDK from Adoptium's GitHub release assets,
+      # which occasionally 504s (same kind of flaky-host issue as the
+      # submodule fetch above, retried for the same reason). setup-java
+      # already retries its own download internally; this adds whole-step
+      # retries on top for when that still isn't enough.
       - uses: actions/setup-java@v4
+        id: setup-java-1
+        continue-on-error: true
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-java@v4
+        id: setup-java-2
+        if: steps.setup-java-1.outcome == 'failure'
+        continue-on-error: true
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-java@v4
+        if: steps.setup-java-1.outcome == 'failure' && steps.setup-java-2.outcome == 'failure'
         with:
           distribution: temurin
           java-version: '17'
