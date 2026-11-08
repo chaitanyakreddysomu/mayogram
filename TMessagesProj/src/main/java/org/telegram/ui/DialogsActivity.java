@@ -616,6 +616,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private DialogsActivityTopBubblesFadeView topBubblesFadeView;
     private ActiveGiftAuctionsHintCell activeGiftAuctionsHintCell;
     private DialogsHintCell dialogsHintCell;
+    private DialogsHintCell mayoUpdateHintCell;
     private UnconfirmedAuthHintCell authHintCell;
     private Long cacheSize, deviceSize;
     private CommunityRequestsCell communityPendingRequests;
@@ -4850,6 +4851,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             });
             topPanelLayout.addView(dialogsHintCell);
 
+            mayoUpdateHintCell = new DialogsHintCell(context);
+            mayoUpdateHintCell.setBackground(Theme.getSelectorDrawable(false));
+            topPanelLayout.addView(mayoUpdateHintCell);
+            topPanelLayout.setPriority(mayoUpdateHintCell, 1);
+            topPanelLayout.setDebugName(mayoUpdateHintCell, "mayogram update");
+            mayoCheckForUpdate();
+
 
             if (communityId != 0) {
                 communityPendingRequests = new CommunityRequestsCell(context, resourceProvider, true);
@@ -5970,6 +5978,35 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 });
         }
         bulletin.show();
+    }
+
+    /**
+     * Mayogram: checks version.json once per DialogsActivity creation and,
+     * if a newer version is listed, shows a top-panel bar (same slot style
+     * as the music-player/location bars above) with an "Update" affordance
+     * on the trailing end. Tapping it opens AppUpdateSheet, the existing
+     * update screen (changelog + download + install).
+     */
+    private void mayoCheckForUpdate() {
+        if (mayoUpdateHintCell == null || topPanelLayout == null) {
+            return;
+        }
+        org.telegram.messenger.AppUpdateController.check((info, error) -> {
+            if (mayoUpdateHintCell == null || topPanelLayout == null) {
+                return;
+            }
+            if (info == null || error) {
+                topPanelLayout.setViewVisible(mayoUpdateHintCell, false);
+                return;
+            }
+            mayoUpdateHintCell.setText("New version available", "Mayogram v" + info.version + " – tap to update", true, false);
+            mayoUpdateHintCell.setOnClickListener(v -> {
+                if (getParentActivity() != null) {
+                    new org.telegram.ui.Components.AppUpdateSheet(getParentActivity()).show();
+                }
+            });
+            topPanelLayout.setViewVisible(mayoUpdateHintCell, true);
+        });
     }
 
     private void updateDialogsHint() {
