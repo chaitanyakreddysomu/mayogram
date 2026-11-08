@@ -14488,6 +14488,14 @@ public class ChatActivity extends BaseFragment implements
                 chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
             }
         }
+        // Mayogram: show a "sent X of Y" progress bulletin for bulk forwards
+        // into this chat - each message's server-delivery confirmation ticks
+        // it forward via mayoOnForwardMessageDelivered (messageReceivedByServer
+        // handler above). Skipped for scheduled sends and single messages,
+        // where a counter has nothing useful to say.
+        if (scheduleDate == 0 && arrayList.size() > 1) {
+            mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
+        }
         int result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
         AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
         if (result != 0) {
