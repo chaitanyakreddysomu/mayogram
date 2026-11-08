@@ -12087,10 +12087,6 @@ public class MessagesController extends BaseController implements NotificationCe
             message.dialog_id = dialogId;
             final MessageObject messageObject = new MessageObject(currentAccount, message, usersDict, chatsDict, true, false, mode == ChatActivity.MODE_SAVED);
             messageObject.scheduled = mode == 1;
-            if (message.mayoSoftDeleted) {
-                // Mayogram: soft-deleted channel post kept in storage - render it deleted again.
-                messageObject.deleted = true;
-            }
             objects.add(messageObject);
             if (isCache) {
                 if (message.legacy && message.layer < TLRPC.LAYER) {

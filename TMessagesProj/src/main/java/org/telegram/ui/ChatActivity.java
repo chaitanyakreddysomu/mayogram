@@ -26507,32 +26507,6 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
 
-        // Mayogram: a channel post that already had views stays visible (dimmed, with a red
-        // trash icon instead of the views row) rather than disappearing - including ones the
-        // current account posted itself. Its MessageObject is already marked .deleted by
-        // MessagesController, so here we just keep it out of the normal removal logic below
-        // and repaint it in place. Secondary bookkeeping that logic does for a removed message
-        // (pinned-message list entry, reply counts) intentionally does NOT run for these - only
-        // the visible-list removal is skipped.
-        if (loadIndex == 0 && ChatObject.isChannel(currentChat) && !DialogObject.isEncryptedDialog(dialog_id)) {
-            boolean mayoHasSoftDeleted = false;
-            for (int mi = markAsDeletedMessages.size() - 1; mi >= 0; mi--) {
-                Integer mid = markAsDeletedMessages.get(mi);
-                MessageObject obj = chatAdapter != null && chatAdapter.isFiltered ? filteredMessagesDict.get(mid) : messagesDict[loadIndex].get(mid);
-                if (obj != null && obj.messageOwner != null && obj.messageOwner.views > 0) {
-                    obj.deleted = true;
-                    markAsDeletedMessages.remove(mi);
-                    mayoHasSoftDeleted = true;
-                }
-            }
-            if (mayoHasSoftDeleted) {
-                invalidateMessagesVisiblePart();
-            }
-            if (markAsDeletedMessages.isEmpty()) {
-                return;
-            }
-        }
-
         if (replyingMessageObject != null && markAsDeletedMessages.contains(replyingMessageObject.getId())) {
             replyingMessageObject = null;
             replyingQuote = null;

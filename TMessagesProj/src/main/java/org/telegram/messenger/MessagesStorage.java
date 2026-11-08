@@ -9944,41 +9944,6 @@ public class MessagesStorage extends BaseController {
                 cursor.dispose();
             }
         }
-        // Mayogram: tag any loaded message that was soft-deleted (channel post, kept in
-        // messages_v2 instead of physically removed) so processLoadedMessages can mark the
-        // resulting MessageObject.deleted, letting it render dimmed+trashed after a reload too.
-        if (!scheduled && !res.messages.isEmpty() && DialogObject.isChatDialog(dialogId)) {
-            SQLiteCursor softCursor = null;
-            try {
-                ArrayList<Integer> midsToCheck = new ArrayList<>();
-                for (int mc = 0; mc < res.messages.size(); mc++) {
-                    midsToCheck.add(res.messages.get(mc).id);
-                }
-                String midsStr = TextUtils.join(",", midsToCheck);
-                softCursor = database.queryFinalized(String.format(Locale.US, "SELECT mid FROM mayo_deleted_posts WHERE uid = %d AND mid IN(%s)", dialogId, midsStr));
-                HashSet<Integer> softDeletedMids = null;
-                while (softCursor.next()) {
-                    if (softDeletedMids == null) {
-                        softDeletedMids = new HashSet<>();
-                    }
-                    softDeletedMids.add(softCursor.intValue(0));
-                }
-                if (softDeletedMids != null) {
-                    for (int mc = 0; mc < res.messages.size(); mc++) {
-                        TLRPC.Message mayoMsg = res.messages.get(mc);
-                        if (softDeletedMids.contains(mayoMsg.id)) {
-                            mayoMsg.mayoSoftDeleted = true;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                checkSQLException(e);
-            } finally {
-                if (softCursor != null) {
-                    softCursor.dispose();
-                }
-            }
-        }
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("messages load time = " + (SystemClock.elapsedRealtime() - startLoadTime) + " for dialog = " + dialogId);
         }
@@ -14630,10 +14595,6 @@ public class MessagesStorage extends BaseController {
                 LongSparseArray<ArrayList<Integer>> savedMessagesByDialogs = new LongSparseArray<>();
                 HashMap<TopicKey, int[]> topicsMessagesToUpdate = new HashMap<>();
                 LongSparseArray<ArrayList<Integer>> messagesByDialogs = new LongSparseArray<>();
-                // Mayogram: channel posts (not mine, had views) that get soft-deleted instead of
-                // physically removed - kept out of the messages_v2 DELETE below and their files
-                // are not deleted, so the post can still render dimmed with a deleted marker.
-                LongSparseArray<ArrayList<Integer>> mayoSoftDeleteMidsByDialog = new LongSparseArray<>();
                 String ids = TextUtils.join(",", messages);
                 ArrayList<File> filesToDelete = new ArrayList<>();
                 ArrayList<String> namesToDelete = new ArrayList<>();
@@ -14686,25 +14647,7 @@ public class MessagesStorage extends BaseController {
                             }
                             data.reuse();
 
-                            // Mayogram: soft-delete eligibility - a channel post (not an encrypted
-                            // chat, had at least one view, including ones the current account
-                            // posted itself) stays in messages_v2 instead of being physically
-                            // deleted, and its downloaded media is kept.
-                            boolean mayoSoftDelete = !DialogObject.isEncryptedDialog(did)
-                                    && DialogObject.isChatDialog(did)
-                                    && did != currentUser
-                                    && message.views > 0
-                                    && org.telegram.messenger.ChatObject.isChannel(getMessagesController().getChat(-did));
-                            if (mayoSoftDelete) {
-                                ArrayList<Integer> softMids = mayoSoftDeleteMidsByDialog.get(did);
-                                if (softMids == null) {
-                                    softMids = new ArrayList<>();
-                                    mayoSoftDeleteMidsByDialog.put(did, softMids);
-                                }
-                                softMids.add(mid);
-                            }
-
-                            if (!mayoSoftDelete && (DialogObject.isEncryptedDialog(did) || deleteFiles)) {
+                            if (DialogObject.isEncryptedDialog(did) || deleteFiles) {
                                 addFilesToDelete(message, filesToDelete, idsToDelete, namesToDelete, false);
                             }
 
@@ -14948,28 +14891,7 @@ public class MessagesStorage extends BaseController {
                         cursor.dispose();
                         cursor = null;
                     }
-                    // Mayogram: soft-deleted posts for this dialog keep their messages_v2 row
-                    // (marked via mayo_deleted_posts) instead of being physically deleted.
-                    ArrayList<Integer> mayoSoftMids = mayoSoftDeleteMidsByDialog.get(did);
-                    if (mayoSoftMids != null && !mayoSoftMids.isEmpty()) {
-                        for (int softIdx = 0; softIdx < mayoSoftMids.size(); softIdx++) {
-                            state = database.executeFast("INSERT OR IGNORE INTO mayo_deleted_posts(uid, mid) VALUES(?, ?)");
-                            state.requery();
-                            state.bindLong(1, did);
-                            state.bindInteger(2, mayoSoftMids.get(softIdx));
-                            state.step();
-                            state.dispose();
-                            state = null;
-                        }
-                        ArrayList<Integer> hardDeleteMids = new ArrayList<>(mids);
-                        hardDeleteMids.removeAll(mayoSoftMids);
-                        if (!hardDeleteMids.isEmpty()) {
-                            String hardIdsStr = TextUtils.join(",", hardDeleteMids);
-                            database.executeFast(String.format(Locale.US, "DELETE FROM messages_v2 WHERE mid IN(%s) AND uid = %d", hardIdsStr, did)).stepThis().dispose();
-                        }
-                    } else {
-                        database.executeFast(String.format(Locale.US, "DELETE FROM messages_v2 WHERE mid IN(%s) AND uid = %d", ids, did)).stepThis().dispose();
-                    }
+                    database.executeFast(String.format(Locale.US, "DELETE FROM messages_v2 WHERE mid IN(%s) AND uid = %d", ids, did)).stepThis().dispose();
                     database.executeFast(String.format(Locale.US, "DELETE FROM messages_topics WHERE mid IN(%s) AND uid = %d", ids, did)).stepThis().dispose();
                     database.executeFast(String.format(Locale.US, "DELETE FROM polls_v2 WHERE mid IN(%s) AND uid = %d", ids, did)).stepThis().dispose();
                     database.executeFast(String.format(Locale.US, "DELETE FROM bot_keyboard WHERE mid IN(%s) AND uid = %d", ids, did)).stepThis().dispose();
