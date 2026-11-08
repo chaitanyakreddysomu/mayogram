@@ -1,8 +1,9 @@
 {
-  "latestVersion": "1.4.12",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.12/app.apk",
-  "changelog": "v1.4.12 - Increased message select count from 100 to 500",
+  "latestVersion": "1.4.18",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.18/app.apk",
+  "changelog": "v1.4.18 - Update notification, music resume fix",
   "features": [
-    "Increased Message Select count from 100 -> 500"
+    "Notifies you when a new update is available",
+    "Music and voice messages now resume from where you paused them"
   ]
 }
