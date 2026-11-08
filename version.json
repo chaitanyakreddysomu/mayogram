@@ -1,8 +1,9 @@
 {
-  "latestVersion": "1.4.17",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.17/app.apk",
-  "changelog": "v1.4.17 - Bug fixes",
+  "latestVersion": "1.4.13",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.4.13/app.apk",
+  "changelog": "v1.4.13 - Display deleted messages, new Mayogram page",
   "features": [
-    "Bug fixes"
+    "Display deleted messages",
+    "Mayogram page"
   ]
 }

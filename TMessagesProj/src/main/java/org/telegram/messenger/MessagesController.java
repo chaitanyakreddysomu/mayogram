@@ -21087,22 +21087,41 @@ public class MessagesController extends BaseController implements NotificationCe
                 }
             }
             if (deletedMessagesFinal != null) {
+                // Mayogram: anti-delete (part 2/2). Previously this posted
+                // NotificationCenter.messagesDeleted (tells ChatActivity to
+                // remove the row) and set obj.deleted = true (makes in-memory
+                // lookups treat it as gone). Instead, mark the message with
+                // mayoDeletedByOther and post replaceMessagesObjects, which
+                // ChatActivity already uses for in-place edits - it re-binds
+                // the existing row with the updated object instead of
+                // removing it, so ChatMessageCell can draw a dustbin icon on
+                // it. The local user's own explicit delete action posts the
+                // real messagesDeleted notification itself from a separate
+                // direct code path (MessagesController.deleteMessages()), so
+                // it is unaffected by this change.
+                LongSparseArray<ArrayList<MessageObject>> markedByRealDialog = new LongSparseArray<>();
                 for (int a = 0, size = deletedMessagesFinal.size(); a < size; a++) {
                     long dialogId = deletedMessagesFinal.keyAt(a);
                     ArrayList<Integer> arrayList = deletedMessagesFinal.valueAt(a);
                     if (arrayList == null) {
                         continue;
                     }
-                    getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, arrayList, -dialogId, false);
                     if (dialogId == 0) {
+                        // Private/group messages: the update didn't carry a
+                        // dialog id, so look each message's own dialog id up
+                        // instead of trusting the (meaningless, 0) map key.
                         for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
                             Integer id = arrayList.get(b);
                             MessageObject obj = dialogMessagesByIds.get(id);
                             if (obj != null) {
-                                if (BuildVars.LOGS_ENABLED) {
-                                    FileLog.d("mark messages " + obj.getId() + " deleted");
+                                obj.mayoDeletedByOther = true;
+                                long realDialogId = obj.getDialogId();
+                                ArrayList<MessageObject> list = markedByRealDialog.get(realDialogId);
+                                if (list == null) {
+                                    list = new ArrayList<>();
+                                    markedByRealDialog.put(realDialogId, list);
                                 }
-                                obj.deleted = true;
+                                list.add(obj);
                             }
                         }
                     } else {
@@ -21113,7 +21132,13 @@ public class MessagesController extends BaseController implements NotificationCe
                                 if (obj != null) {
                                     for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
                                         if (obj.getId() == arrayList.get(b)) {
-                                            obj.deleted = true;
+                                            obj.mayoDeletedByOther = true;
+                                            ArrayList<MessageObject> list = markedByRealDialog.get(dialogId);
+                                            if (list == null) {
+                                                list = new ArrayList<>();
+                                                markedByRealDialog.put(dialogId, list);
+                                            }
+                                            list.add(obj);
                                             break;
                                         }
                                     }
@@ -21121,6 +21146,9 @@ public class MessagesController extends BaseController implements NotificationCe
                             }
                         }
                     }
+                }
+                for (int a = 0, size = markedByRealDialog.size(); a < size; a++) {
+                    getNotificationCenter().postNotificationName(NotificationCenter.replaceMessagesObjects, markedByRealDialog.keyAt(a), markedByRealDialog.valueAt(a), false);
                 }
                 getNotificationsController().removeDeletedMessagesFromNotifications(deletedMessagesFinal, false);
             }
@@ -21206,16 +21234,29 @@ public class MessagesController extends BaseController implements NotificationCe
                 getMessagesStorage().markMessagesContentAsRead(key, arrayList, currentTime2, markContentAsReadMessagesDate);
             }
         }
-        if (deletedMessages != null) {
-            for (int a = 0, size = deletedMessages.size(); a < size; a++) {
-                long key = deletedMessages.keyAt(a);
-                ArrayList<Integer> arrayList = deletedMessages.valueAt(a);
-                getMessagesStorage().getStorageQueue().postRunnable(() -> {
-                    ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
-                    getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds);
-                });
-            }
-        }
+        // Mayogram: anti-delete (part 1/2 - see part 2/2 below near
+        // deletedMessagesFinal for the main-thread/UI side of this).
+        // This block only runs for deletions that arrived via an incoming
+        // server update (TL_updateDeleteMessages / TL_updateDeleteChannelMessages)
+        // - i.e. someone else deleted a message, or the server echoed back
+        // a deletion. The local user's own explicit delete action
+        // (MessagesController.deleteMessages()) is a separate direct code
+        // path that already removed the message from storage before any
+        // update could arrive, so it is unaffected by disabling this.
+        // Skipping the actual markMessagesAsDeleted()/updateDialogs call
+        // here means the message simply stays in local storage, instead of
+        // being permanently removed next time it's loaded from the DB.
+        //
+        // if (deletedMessages != null) {
+        //     for (int a = 0, size = deletedMessages.size(); a < size; a++) {
+        //         long key = deletedMessages.keyAt(a);
+        //         ArrayList<Integer> arrayList = deletedMessages.valueAt(a);
+        //         getMessagesStorage().getStorageQueue().postRunnable(() -> {
+        //             ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
+        //             getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds);
+        //         });
+        //     }
+        // }
         if (deletedQuickReplyMessages != null) {
             final long selfId = getUserConfig().getClientUserId();
             for (int a = 0, size = deletedQuickReplyMessages.size(); a < size; a++) {
