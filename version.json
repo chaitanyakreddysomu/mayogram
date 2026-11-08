@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.5.3",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.3/app.apk",
-  "changelog": "v1.5.3 - Fixed the forwarding progress bar disappearing mid-forward",
+  "latestVersion": "1.5.4",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.4/app.apk",
+  "changelog": "v1.5.4 - Made the forwarding progress bar truly permanent",
   "features": [
-    "The forwarding progress bar no longer disappears early if another notification pops up while forwarding",
-    "The sent count now stays accurate the whole way through, even if the bar had to reappear"
+    "The forwarding progress bar is no longer a toast - other notifications popping up can't dismiss it anymore",
+    "It now stays on screen the whole time forwarding is running, with an accurate sent count"
   ]
 }
