@@ -796,10 +796,17 @@ public class ChatActivity extends BaseFragment implements
     private MessageObject forwardingMessage;
     private MessageObject.GroupedMessages forwardingMessageGroup;
     private Bulletin mayoForwardProgressBulletin;
-    private Bulletin.ProgressLayout mayoForwardProgressLayout;
+    private Bulletin.LottieLayout mayoForwardProgressLayout;
     private java.util.HashSet<Long> mayoForwardProgressDialogIds;
     private int mayoForwardProgressTotal;
     private int mayoForwardProgressSent;
+    private ArrayList<MessageObject> mayoForwardQueue;
+    private int mayoForwardQueueNextIndex;
+    private boolean mayoForwardQueueFromMyName;
+    private boolean mayoForwardQueueHideCaption;
+    private boolean mayoForwardQueueNotify;
+    private long mayoForwardQueuePayStars;
+    private static final int MAYO_FORWARD_CHUNK_SIZE = 10;
     private MessageObject.GroupedMessages replyingQuoteGroup;
     public MessageObject replyingTopMessage;
     private ReplyQuote replyingQuote;
@@ -14421,6 +14428,14 @@ public class ChatActivity extends BaseFragment implements
         getConnectionsManager().bindRequestToGuid(linkSearchRequestId, classGuid);
     }
 
+    /**
+     * Mayogram: persistent "N of M forwarded" bar, not a toast - no timed
+     * auto-hide (duration -1 to Bulletin.create, and no safety-timeout
+     * runnable either, unlike the old version of this), so it stays up for
+     * however long the actual forwarding takes, with a Cancel button that
+     * stops tracking the batch (it does not, and cannot, recall messages
+     * that already reached the server - see mayoStopForwardProgress).
+     */
     private void mayoStartForwardProgress(java.util.Collection<Long> dialogIds, int total) {
         if (total <= 0 || getParentActivity() == null) {
             return;
@@ -14429,19 +14444,21 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressDialogIds = new java.util.HashSet<>(dialogIds);
         mayoForwardProgressTotal = total;
         mayoForwardProgressSent = 0;
-        mayoForwardProgressLayout = new Bulletin.ProgressLayout(getContext(), themeDelegate);
-        mayoForwardProgressLayout.textView.setText(LocaleController.getString(R.string.MayoForwardingMessagesTitle), false);
-        mayoForwardProgressLayout.setProgress(0f);
+        mayoForwardProgressLayout = new Bulletin.LottieLayout(getContext(), themeDelegate);
+        // Mayogram: flat corners + same fill as the input bar below it, so
+        // the two read as one continuous panel instead of a floating card
+        // sitting on top of a separate bar.
+        mayoForwardProgressLayout.setBackground(getThemedColor(Theme.key_chat_messagePanelBackground), 0);
+        mayoForwardProgressLayout.imageView.setImageResource(R.drawable.msg_check_s);
+        mayoForwardProgressLayout.imageView.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_undo_infoColor), PorterDuff.Mode.MULTIPLY));
+        mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, 0, mayoForwardProgressTotal));
+        mayoForwardProgressLayout.setButton(new Bulletin.UndoButton(getContext(), true, themeDelegate)
+                .setText(LocaleController.getString(R.string.Cancel))
+                .setUndoAction(this::mayoStopForwardProgress));
         mayoForwardProgressBulletin = BulletinFactory.of(this).create(mayoForwardProgressLayout, -1);
         mayoForwardProgressBulletin.hideAfterBottomSheet = false;
         mayoForwardProgressBulletin.setCanHide(false);
         mayoForwardProgressBulletin.show();
-        final Bulletin startedBulletin = mayoForwardProgressBulletin;
-        AndroidUtilities.runOnUIThread(() -> {
-            if (mayoForwardProgressBulletin == startedBulletin && startedBulletin != null) {
-                mayoStopForwardProgress();
-            }
-        }, 20000);
     }
 
     private void mayoOnForwardMessageDelivered(long dialogId) {
@@ -14449,8 +14466,15 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         mayoForwardProgressSent = Math.min(mayoForwardProgressSent + 1, mayoForwardProgressTotal);
-        mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, mayoForwardProgressSent, mayoForwardProgressTotal), true);
-        mayoForwardProgressLayout.setProgress(mayoForwardProgressSent / (float) mayoForwardProgressTotal);
+        mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, mayoForwardProgressSent, mayoForwardProgressTotal));
+        if (mayoForwardQueue != null && mayoForwardProgressSent >= mayoForwardQueueNextIndex && mayoForwardQueueNextIndex < mayoForwardQueue.size()) {
+            int result = mayoSendNextForwardChunk();
+            if (result != 0) {
+                AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
+                mayoStopForwardProgress();
+                return;
+            }
+        }
         if (mayoForwardProgressSent >= mayoForwardProgressTotal) {
             final Bulletin bulletin = mayoForwardProgressBulletin;
             AndroidUtilities.runOnUIThread(() -> {
@@ -14462,7 +14486,19 @@ public class ChatActivity extends BaseFragment implements
             mayoForwardProgressBulletin = null;
             mayoForwardProgressLayout = null;
             mayoForwardProgressDialogIds = null;
+            mayoForwardQueue = null;
         }
+    }
+
+    /** Mayogram: sends the next up-to-MAYO_FORWARD_CHUNK_SIZE slice of mayoForwardQueue. */
+    private int mayoSendNextForwardChunk() {
+        if (mayoForwardQueue == null || mayoForwardQueueNextIndex >= mayoForwardQueue.size()) {
+            return 0;
+        }
+        int end = Math.min(mayoForwardQueueNextIndex + MAYO_FORWARD_CHUNK_SIZE, mayoForwardQueue.size());
+        ArrayList<MessageObject> chunk = new ArrayList<>(mayoForwardQueue.subList(mayoForwardQueueNextIndex, end));
+        mayoForwardQueueNextIndex = end;
+        return getSendMessagesHelper().sendMessage(chunk, dialog_id, mayoForwardQueueFromMyName, mayoForwardQueueHideCaption, mayoForwardQueueNotify, 0, 0, getThreadMessage(), -1, mayoForwardQueuePayStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
     }
 
     private void mayoStopForwardProgress() {
@@ -14473,6 +14509,10 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressBulletin = null;
         mayoForwardProgressLayout = null;
         mayoForwardProgressDialogIds = null;
+        // Not nulling mayoForwardQueueNextIndex: mayoForwardQueue == null is
+        // the only check mayoOnForwardMessageDelivered needs to stop queuing
+        // further chunks once whatever chunk is already in flight lands.
+        mayoForwardQueue = null;
     }
 
     private void forwardMessages(ArrayList<MessageObject> arrayList, boolean fromMyName, boolean hideCaption, boolean notify, int scheduleDate, long payStars) {
@@ -14488,13 +14528,34 @@ public class ChatActivity extends BaseFragment implements
                 chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
             }
         }
-        // Mayogram: show a "sent X of Y" progress bulletin for bulk forwards
-        // into this chat - each message's server-delivery confirmation ticks
-        // it forward via mayoOnForwardMessageDelivered (messageReceivedByServer
-        // handler above). Skipped for scheduled sends and single messages,
-        // where a counter has nothing useful to say.
+        // Mayogram: bulk forwards (>1 message, not scheduled) into this chat
+        // go out in small chunks instead of one big batch, with a "sent X of
+        // Y" progress bar - each chunk's deliveries tick it forward via
+        // mayoOnForwardMessageDelivered, which also kicks off the next
+        // chunk. This is what makes Cancel meaningful: it just stops
+        // queuing further chunks, so whatever chunk is already in flight
+        // finishes but nothing after it gets sent. A single sendMessage()
+        // call forwarding all of them at once would hit the server as one
+        // atomic request - nothing left to interrupt by the time any
+        // progress is visible.
         if (scheduleDate == 0 && arrayList.size() > 1) {
             mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
+            mayoForwardQueue = arrayList;
+            mayoForwardQueueNextIndex = 0;
+            mayoForwardQueueFromMyName = fromMyName;
+            mayoForwardQueueHideCaption = hideCaption;
+            mayoForwardQueueNotify = notify;
+            mayoForwardQueuePayStars = payStars;
+            int result = mayoSendNextForwardChunk();
+            AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
+            if (result != 0) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    waitingForSendingMessageLoad = false;
+                    hideFieldPanel(true);
+                });
+                mayoStopForwardProgress();
+            }
+            return;
         }
         int result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
         AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
