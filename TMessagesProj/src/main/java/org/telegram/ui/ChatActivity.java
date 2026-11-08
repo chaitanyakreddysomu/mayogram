@@ -802,11 +802,12 @@ public class ChatActivity extends BaseFragment implements
     private int mayoForwardProgressSent;
     private ArrayList<MessageObject> mayoForwardQueue;
     private int mayoForwardQueueNextIndex;
+    private int mayoForwardPendingCount;
     private boolean mayoForwardQueueFromMyName;
     private boolean mayoForwardQueueHideCaption;
     private boolean mayoForwardQueueNotify;
     private long mayoForwardQueuePayStars;
-    private static final int MAYO_FORWARD_CHUNK_SIZE = 10;
+    private static final int MAYO_FORWARD_CHUNK_SIZE = 1;
     private MessageObject.GroupedMessages replyingQuoteGroup;
     public MessageObject replyingTopMessage;
     private ReplyQuote replyingQuote;
@@ -14461,20 +14462,25 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressBulletin.show();
     }
 
+    /**
+     * Mayogram: messageReceivedByServer fires for every message WE send to
+     * this dialog, not only the ones this forward operation dispatched - if
+     * the user sends something else manually while a forward is in
+     * progress, that also matches on dialogId alone, previously inflating
+     * the "sent" count. mayoForwardPendingCount is how many confirmations
+     * this operation is actually still waiting on (1, with chunk size 1);
+     * only decrement/count while that's > 0, and ignore anything else.
+     */
     private void mayoOnForwardMessageDelivered(long dialogId) {
         if (mayoForwardProgressDialogIds == null || !mayoForwardProgressDialogIds.contains(dialogId) || mayoForwardProgressLayout == null) {
             return;
         }
+        if (mayoForwardPendingCount <= 0) {
+            return;
+        }
+        mayoForwardPendingCount--;
         mayoForwardProgressSent = Math.min(mayoForwardProgressSent + 1, mayoForwardProgressTotal);
         mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, mayoForwardProgressSent, mayoForwardProgressTotal));
-        if (mayoForwardQueue != null && mayoForwardProgressSent >= mayoForwardQueueNextIndex && mayoForwardQueueNextIndex < mayoForwardQueue.size()) {
-            int result = mayoSendNextForwardChunk();
-            if (result != 0) {
-                AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
-                mayoStopForwardProgress();
-                return;
-            }
-        }
         if (mayoForwardProgressSent >= mayoForwardProgressTotal) {
             final Bulletin bulletin = mayoForwardProgressBulletin;
             AndroidUtilities.runOnUIThread(() -> {
@@ -14487,6 +14493,17 @@ public class ChatActivity extends BaseFragment implements
             mayoForwardProgressLayout = null;
             mayoForwardProgressDialogIds = null;
             mayoForwardQueue = null;
+            return;
+        }
+        // mayoForwardQueue is nulled the instant Cancel is pressed, so once
+        // the in-flight message above lands, nothing further is queued -
+        // the 3rd message never goes out if Cancel landed after the 2nd.
+        if (mayoForwardQueue != null && mayoForwardQueueNextIndex < mayoForwardQueue.size()) {
+            int result = mayoSendNextForwardChunk();
+            if (result != 0) {
+                AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
+                mayoStopForwardProgress();
+            }
         }
     }
 
@@ -14498,6 +14515,7 @@ public class ChatActivity extends BaseFragment implements
         int end = Math.min(mayoForwardQueueNextIndex + MAYO_FORWARD_CHUNK_SIZE, mayoForwardQueue.size());
         ArrayList<MessageObject> chunk = new ArrayList<>(mayoForwardQueue.subList(mayoForwardQueueNextIndex, end));
         mayoForwardQueueNextIndex = end;
+        mayoForwardPendingCount = chunk.size();
         return getSendMessagesHelper().sendMessage(chunk, dialog_id, mayoForwardQueueFromMyName, mayoForwardQueueHideCaption, mayoForwardQueueNotify, 0, 0, getThreadMessage(), -1, mayoForwardQueuePayStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
     }
 
@@ -14509,9 +14527,10 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressBulletin = null;
         mayoForwardProgressLayout = null;
         mayoForwardProgressDialogIds = null;
-        // Not nulling mayoForwardQueueNextIndex: mayoForwardQueue == null is
-        // the only check mayoOnForwardMessageDelivered needs to stop queuing
-        // further chunks once whatever chunk is already in flight lands.
+        // mayoForwardQueue == null is the only check
+        // mayoOnForwardMessageDelivered needs to stop queuing further
+        // messages once whatever's already in flight (mayoForwardPendingCount)
+        // lands - that one can't be recalled, but nothing past it goes out.
         mayoForwardQueue = null;
     }
 
@@ -14529,15 +14548,16 @@ public class ChatActivity extends BaseFragment implements
             }
         }
         // Mayogram: bulk forwards (>1 message, not scheduled) into this chat
-        // go out in small chunks instead of one big batch, with a "sent X of
-        // Y" progress bar - each chunk's deliveries tick it forward via
-        // mayoOnForwardMessageDelivered, which also kicks off the next
-        // chunk. This is what makes Cancel meaningful: it just stops
-        // queuing further chunks, so whatever chunk is already in flight
-        // finishes but nothing after it gets sent. A single sendMessage()
-        // call forwarding all of them at once would hit the server as one
-        // atomic request - nothing left to interrupt by the time any
-        // progress is visible.
+        // go out one message at a time (MAYO_FORWARD_CHUNK_SIZE) instead of
+        // one big batch, with a "sent X of Y" progress bar - each message's
+        // delivery confirmation ticks it forward via
+        // mayoOnForwardMessageDelivered, which also sends the next one. This
+        // is what makes Cancel immediate: it just stops queuing anything
+        // further, so whichever single message is already in flight when
+        // Cancel is pressed finishes (can't be recalled), but the one after
+        // it never goes out. A single sendMessage() call forwarding all of
+        // them at once would hit the server as one atomic request - nothing
+        // left to interrupt by the time any progress is visible.
         if (scheduleDate == 0 && arrayList.size() > 1) {
             mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
             mayoForwardQueue = arrayList;
