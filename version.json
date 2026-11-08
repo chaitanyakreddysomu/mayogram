@@ -1,8 +1,9 @@
 {
-  "latestVersion": "1.5.0",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.0/app.apk",
-  "changelog": "v1.5.0 - Bug fixes in forwarding messages",
+  "latestVersion": "1.5.1",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.1/app.apk",
+  "changelog": "v1.5.1 - Fixed forwarding progress count and made Cancel stop immediately",
   "features": [
-    "Bug fixes in forwarding messages"
+    "Fixed the forwarding progress count showing the wrong number",
+    "Cancel while forwarding now stops right away instead of sending more messages first"
   ]
 }
