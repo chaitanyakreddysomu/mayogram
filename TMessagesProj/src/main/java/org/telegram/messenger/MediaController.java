@@ -3942,7 +3942,14 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 }
                 if (messageObject.isVoice()) {
                     String name = messageObject.getFileName();
-                    if (name != null && messageObject.getDuration() >= 5 * 60) {
+                    // Mayogram: used to only save/restore position for voice
+                    // messages 5+ minutes long. Short messages never got a
+                    // saved position at all, so pausing one and coming back
+                    // after the app's process was killed in the background
+                    // (common after a few minutes backgrounded) always
+                    // restarted from 0 instead of resuming. Apply to every
+                    // voice message regardless of length.
+                    if (name != null) {
                         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("media_saved_pos", Activity.MODE_PRIVATE);
                         float pos = preferences.getFloat(name, -1);
                         if (pos > 0 && pos < 0.99f) {
@@ -3964,7 +3971,13 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                         FileLog.e(e);
                     }
                     String name = messageObject.getFileName();
-                    if (!TextUtils.isEmpty(name) && messageObject.getDuration() >= 10 * 60) {
+                    // Mayogram: same fix as the voice-message case above -
+                    // used to only apply to tracks 10+ minutes long, so a
+                    // normal 3-4 minute song paused and resumed after the
+                    // app's process got killed in the background always
+                    // restarted from 0. Apply to every track regardless of
+                    // length.
+                    if (!TextUtils.isEmpty(name)) {
                         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("media_saved_pos", Activity.MODE_PRIVATE);
                         float pos = preferences.getFloat(name, -1);
                         if (pos > 0 && pos < 0.999f) {
