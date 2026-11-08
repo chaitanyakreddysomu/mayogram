@@ -14454,6 +14454,15 @@ public class ChatActivity extends BaseFragment implements
         mayoShowForwardProgressBar();
     }
 
+    // Mayogram: same rounding (22dp) and glass/blur fill as the real input
+    // bubble (ChatInputViewsContainer.INPUT_BUBBLE_RADIUS, built with this
+    // same glassBackgroundDrawableFactory + blurredBackgroundColorProvider
+    // pair), and the same 7dp side inset, so this bar reads as a second
+    // native input-style bubble stacked right above it, not a foreign toast.
+    private static final int MAYO_FORWARD_BAR_RADIUS_DP = 22;
+    private static final int MAYO_FORWARD_BAR_SIDE_INSET_DP = 7;
+    private static final int MAYO_FORWARD_BAR_GAP_DP = 9;
+
     private void mayoShowForwardProgressBar() {
         if (mayoForwardProgressBar != null || contentView == null || chatActivityEnterView == null) {
             return;
@@ -14463,14 +14472,14 @@ public class ChatActivity extends BaseFragment implements
         LinearLayout bar = new LinearLayout(context);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        // Mayogram: same fill as the input bar below it, so the two read as
-        // one continuous panel instead of a floating card on top of it.
-        bar.setBackgroundColor(getThemedColor(Theme.key_chat_messagePanelBackground));
-        bar.setPadding(dp(16), dp(10), dp(14), dp(10));
+        bar.setBackground(glassBackgroundDrawableFactory.create(bar, blurredBackgroundColorProvider)
+                .setRadius(dp(MAYO_FORWARD_BAR_RADIUS_DP))
+                .setPadding(dp(7)));
+        bar.setPadding(dp(16), dp(11), dp(14), dp(11));
 
         ImageView icon = new ImageView(context);
         icon.setImageResource(R.drawable.msg_check_s);
-        icon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_undo_infoColor), PorterDuff.Mode.MULTIPLY));
+        icon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_messagePanelIcons), PorterDuff.Mode.MULTIPLY));
         bar.addView(icon, LayoutHelper.createLinear(24, 24, 0, 0, 0, 12, 0));
 
         TextView text = new TextView(context);
@@ -14481,7 +14490,7 @@ public class ChatActivity extends BaseFragment implements
 
         TextView cancel = new TextView(context);
         cancel.setText(LocaleController.getString(R.string.Cancel));
-        cancel.setTextColor(getThemedColor(Theme.key_chat_fieldOverlayText));
+        cancel.setTextColor(getThemedColor(Theme.key_chat_messagePanelSend));
         cancel.setTypeface(AndroidUtilities.bold());
         cancel.setPadding(dp(12), dp(6), dp(0), dp(6));
         cancel.setOnClickListener(v -> mayoStopForwardProgress());
@@ -14490,7 +14499,8 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressBar = bar;
         mayoForwardProgressTextView = text;
 
-        contentView.addView(bar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.BOTTOM));
+        contentView.addView(bar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.BOTTOM,
+                MAYO_FORWARD_BAR_SIDE_INSET_DP, 0, MAYO_FORWARD_BAR_SIDE_INSET_DP, 0));
         mayoUpdateForwardProgressBarPosition();
         mayoForwardProgressAnchorListener = (v, l, t, r, b, ol, ot, or_, ob) -> mayoUpdateForwardProgressBarPosition();
         chatActivityEnterView.addOnLayoutChangeListener(mayoForwardProgressAnchorListener);
@@ -14501,7 +14511,7 @@ public class ChatActivity extends BaseFragment implements
             return;
         }
         ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) mayoForwardProgressBar.getLayoutParams();
-        int newMargin = chatActivityEnterView.getHeight();
+        int newMargin = chatActivityEnterView.getHeight() + dp(MAYO_FORWARD_BAR_GAP_DP);
         if (lp.bottomMargin != newMargin) {
             lp.bottomMargin = newMargin;
             mayoForwardProgressBar.setLayoutParams(lp);

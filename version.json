@@ -1,8 +1,10 @@
 {
-  "latestVersion": "1.5.5",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.5/app.apk",
-  "changelog": "v1.5.5 - Fixed the forwarding count jumping by 2 per message",
+  "latestVersion": "1.6.0",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.6.0/app.apk",
+  "changelog": "v1.6.0 - Restyled the forwarding progress bar to match the app's native look",
   "features": [
-    "Forwarding one message no longer counts as two - the sent count now matches what's actually been sent"
+    "The forwarding progress bar now uses the same rounded, glass-style look as the message box",
+    "It sits right above the message box at the same width, instead of stretching edge to edge",
+    "The Cancel text now uses the app's accent color, matching other buttons in the input area"
   ]
 }
