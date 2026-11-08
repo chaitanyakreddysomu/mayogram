@@ -14445,6 +14445,20 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressDialogIds = new java.util.HashSet<>(dialogIds);
         mayoForwardProgressTotal = total;
         mayoForwardProgressSent = 0;
+        mayoBuildForwardProgressBulletin(0);
+    }
+
+    /**
+     * Mayogram: Bulletin only ever shows one bar at a time - showing any
+     * other bulletin anywhere in the app (a "copied", "muted", undo-delete
+     * toast, etc.) silently hides whatever was showing before, including
+     * this one, with no regard for setCanHide(false). That's what made the
+     * forwarding bar disappear partway through instead of staying up for
+     * the whole operation. setOnHideListener below (mayoOnForwardBulletinHidden)
+     * detects that and rebuilds/re-shows it with the same counters, instead
+     * of just leaving forwarding running with nothing visible.
+     */
+    private void mayoBuildForwardProgressBulletin(int initialSent) {
         mayoForwardProgressLayout = new Bulletin.LottieLayout(getContext(), themeDelegate);
         // Mayogram: flat corners + same fill as the input bar below it, so
         // the two read as one continuous panel instead of a floating card
@@ -14452,14 +14466,37 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressLayout.setBackground(getThemedColor(Theme.key_chat_messagePanelBackground), 0);
         mayoForwardProgressLayout.imageView.setImageResource(R.drawable.msg_check_s);
         mayoForwardProgressLayout.imageView.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_undo_infoColor), PorterDuff.Mode.MULTIPLY));
-        mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, 0, mayoForwardProgressTotal));
+        mayoForwardProgressLayout.textView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, initialSent, mayoForwardProgressTotal));
         mayoForwardProgressLayout.setButton(new Bulletin.UndoButton(getContext(), true, themeDelegate)
                 .setText(LocaleController.getString(R.string.Cancel))
                 .setUndoAction(this::mayoStopForwardProgress));
         mayoForwardProgressBulletin = BulletinFactory.of(this).create(mayoForwardProgressLayout, -1);
         mayoForwardProgressBulletin.hideAfterBottomSheet = false;
+        // Don't let Bulletin's own show() flip canHide back to true once the
+        // enter animation finishes - keep it permanently not-swipe-dismissible
+        // until we explicitly allow it (Cancel or finishing).
+        mayoForwardProgressBulletin.setCanHideOnShow = false;
         mayoForwardProgressBulletin.setCanHide(false);
+        mayoForwardProgressBulletin.setOnHideListener(this::mayoOnForwardBulletinHidden);
         mayoForwardProgressBulletin.show();
+    }
+
+    private void mayoOnForwardBulletinHidden() {
+        // mayoStopForwardProgress and the completion branch of
+        // mayoOnForwardMessageDelivered both null mayoForwardQueue
+        // synchronously, before the (possibly animated, so delayed) hide
+        // this listener is attached to actually finishes - so if it's still
+        // non-null here, this hide was NOT one we asked for: something else
+        // preempted the bar mid-forward. Rebuild it with the current counts.
+        if (mayoForwardQueue == null || mayoForwardProgressDialogIds == null) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            if (mayoForwardQueue == null || mayoForwardProgressDialogIds == null || getParentActivity() == null) {
+                return;
+            }
+            mayoBuildForwardProgressBulletin(mayoForwardProgressSent);
+        });
     }
 
     /**

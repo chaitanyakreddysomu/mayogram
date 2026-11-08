@@ -1,11 +1,9 @@
 {
-  "latestVersion": "1.5.2",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.2/app.apk",
-  "changelog": "v1.5.2 - Fixed the app update downloader",
+  "latestVersion": "1.5.3",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.5.3/app.apk",
+  "changelog": "v1.5.3 - Fixed the forwarding progress bar disappearing mid-forward",
   "features": [
-    "Closing and reopening the update screen now shows the real download progress instead of restarting",
-    "An update that's already fully downloaded won't be downloaded again - it goes straight to Install",
-    "If a download fails partway, it resumes instead of starting over from 0%",
-    "Downloads keep going in the background even if you close the update screen"
+    "The forwarding progress bar no longer disappears early if another notification pops up while forwarding",
+    "The sent count now stays accurate the whole way through, even if the bar had to reappear"
   ]
 }
