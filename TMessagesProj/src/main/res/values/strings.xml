@@ -307,6 +307,9 @@
     <string name="ForwardTo">Forward to...</string>
     <string name="MayoForwardingMessagesTitle">Forwarding messages</string>
     <string name="MayoForwardingMessagesProgress">sent %1$d of %2$d</string>
+    <string name="MayoScheduledMessages">Scheduled Messages</string>
+    <string name="MayoScheduledMessagesEmpty">No scheduled messages</string>
+    <string name="MayoSelectAllChannels">Select all channels I can post in</string>
     <string name="MyGroups">My Groups</string>
     <string name="MyChannels">My Channels</string>
     <string name="DisappearingPhoto">Secret Photo</string>

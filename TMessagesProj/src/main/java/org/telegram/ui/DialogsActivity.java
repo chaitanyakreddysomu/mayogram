@@ -676,6 +676,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private Runnable shareLinkSearchRunnable;
 
     private ArrayList<Long> selectedDialogs = new ArrayList<>();
+    private static final int MAYO_SELECT_ALL_CHANNELS_ID = 1001;
     public boolean notify = true;
     public int scheduleDate;
     public int scheduleRepeatPeriod;
@@ -3449,6 +3450,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 showItemOptions();
                 return true;
             });
+        }
+        // Mayogram: one-tap "select every channel I can post in" for the
+        // forward-to picker, so forwarding one message to many channels you
+        // own/admin doesn't mean tapping each one by hand.
+        if (initialDialogsType == DIALOGS_TYPE_FORWARD) {
+            ActionBarMenuItem mayoSelectAllChannelsItem = menu.addItem(MAYO_SELECT_ALL_CHANNELS_ID, R.drawable.msg_select);
+            mayoSelectAllChannelsItem.setContentDescription(LocaleController.getString(R.string.MayoSelectAllChannels));
+            mayoSelectAllChannelsItem.setOnClickListener(v -> mayoSelectAllWritableChannels());
         }
 
         searchItem.setSearchFieldHint(getString(R.string.Search));
@@ -10318,6 +10327,34 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         doneItemAnimator.start();
     }
 
+    /**
+     * Mayogram: selects every broadcast channel (not megagroups, not
+     * personal chats) the account can actually post in - creator or admin
+     * with post rights - so forwarding to all of them is tap-select-all,
+     * then the normal multi-forward send.
+     */
+    private void mayoSelectAllWritableChannels() {
+        ArrayList<TLRPC.Dialog> allDialogs = getMessagesController().getAllDialogs();
+        for (int a = 0, N = allDialogs.size(); a < N; a++) {
+            long dialogId = allDialogs.get(a).id;
+            if (selectedDialogs.contains(dialogId) || !DialogObject.isChatDialog(dialogId)) {
+                continue;
+            }
+            TLRPC.Chat chat = getMessagesController().getChat(-dialogId);
+            if (chat != null && ChatObject.isChannel(chat) && !chat.megagroup && ChatObject.isCanWriteToChannel(-dialogId, currentAccount)) {
+                addOrRemoveSelectedDialog(dialogId, null);
+            }
+        }
+        updateSelectedCount();
+        if (viewPages != null) {
+            for (int a = 0; a < viewPages.length; a++) {
+                if (viewPages[a] != null && viewPages[a].dialogsAdapter != null) {
+                    viewPages[a].dialogsAdapter.notifyDataSetChanged();
+                }
+            }
+        }
+    }
+
     private boolean wasSelectedDialogsEmpty;
     private void updateSelectedCount() {
         if (commentView != null) {
@@ -13792,6 +13829,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             Bundle args = new Bundle();
             args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
             presentFragment(new ChatActivity(args));
+        });
+        io.add(R.drawable.msg_calendar2, getString(R.string.MayoScheduledMessages), () -> {
+            presentFragment(new org.telegram.ui.MayoScheduledDialogsActivity());
         });
         io.add(R.drawable.msg_download, "Updates", () -> {
             if (getParentActivity() != null) {

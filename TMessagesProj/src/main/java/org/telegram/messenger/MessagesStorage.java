@@ -14484,6 +14484,46 @@ public class MessagesStorage extends BaseController {
         });
     }
 
+    /**
+     * Mayogram: for the "Scheduled Messages" dashboard (list of every dialog
+     * that has at least one scheduled message, with its most recent one as
+     * a preview) - one row per dialog, newest scheduled message per dialog
+     * kept thanks to the ORDER BY + "first one wins" dedup below.
+     */
+    public void loadDialogsWithScheduledMessages(int currentAccount, Utilities.Callback<LongSparseArray<MessageObject>> callback) {
+        storageQueue.postRunnable(() -> {
+            LongSparseArray<MessageObject> result = new LongSparseArray<>();
+            SQLiteCursor cursor = null;
+            try {
+                cursor = database.queryFinalized("SELECT uid, data, mid, date FROM scheduled_messages_v2 ORDER BY date DESC");
+                while (cursor.next()) {
+                    long uid = cursor.longValue(0);
+                    if (result.get(uid) != null) {
+                        continue;
+                    }
+                    NativeByteBuffer data = cursor.byteBufferValue(1);
+                    if (data == null) {
+                        continue;
+                    }
+                    TLRPC.Message message = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
+                    message.readAttachPath(data, getUserConfig().clientUserId);
+                    data.reuse();
+                    message.id = cursor.intValue(2);
+                    message.dialog_id = uid;
+                    message.date = cursor.intValue(3);
+                    result.put(uid, new MessageObject(currentAccount, message, false, false));
+                }
+            } catch (Exception e) {
+                checkSQLException(e);
+            } finally {
+                if (cursor != null) {
+                    cursor.dispose();
+                }
+            }
+            AndroidUtilities.runOnUIThread(() -> callback.run(result));
+        });
+    }
+
     protected void deletePushMessages(long dialogId, ArrayList<Integer> messages) {
         try {
             database.executeFast(String.format(Locale.US, "DELETE FROM unread_push_messages WHERE uid = %d AND mid IN(%s)", dialogId, TextUtils.join(",", messages))).stepThis().dispose();
