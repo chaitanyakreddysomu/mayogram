@@ -10687,7 +10687,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                 settingsSectionRow2 = rowCount++;
                 chatRow = rowCount++;
-                mayogramCustomiseRow = rowCount++;
                 privacyRow = rowCount++;
                 notificationRow = rowCount++;
                 dataRow = rowCount++;
@@ -10699,6 +10698,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 devicesRow = rowCount++;
                 languageRow = rowCount++;
                 mayogramRow = rowCount++;
+                mayogramCustomiseRow = rowCount++;
                 supportUsRow = rowCount++;
                 devicesSectionRow = rowCount++;
                 if (!getMessagesController().premiumFeaturesBlocked()) {
@@ -15791,11 +15791,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, dataRow, sparseIntArray);
             put(++pointer, liteModeRow, sparseIntArray);
             put(++pointer, chatRow, sparseIntArray);
-            put(++pointer, mayogramCustomiseRow, sparseIntArray);
             put(++pointer, filtersRow, sparseIntArray);
             put(++pointer, stickersRow, sparseIntArray);
             put(++pointer, devicesRow, sparseIntArray);
             put(++pointer, mayogramRow, sparseIntArray);
+            put(++pointer, mayogramCustomiseRow, sparseIntArray);
             put(++pointer, supportUsRow, sparseIntArray);
             put(++pointer, devicesSectionRow, sparseIntArray);
             put(++pointer, helpHeaderRow, sparseIntArray);
