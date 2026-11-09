@@ -1,6 +1,6 @@
 {
-  "latestVersion": "1.0.0",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.0.1/app.apk",
-  "changelog": "Beta channel set up - this file is overwritten automatically by CI on every push to the beta branch",
+  "latestVersion": "1.0.0-beta.105",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/beta-v1.0.0-beta.105/app-beta.apk",
+  "changelog": "Beta build from commit d07fd7e7a82e508ddc11df5a1264c02f3e2546b6",
   "features": []
 }
