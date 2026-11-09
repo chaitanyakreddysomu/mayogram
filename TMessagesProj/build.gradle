@@ -269,6 +269,10 @@ android {
         // update channel (IS_BETA) and its own applicationId suffix so it can
         // be installed side by side with the main release build.
         beta {
+            // media3 (and any other library dependency) only has debug/release
+            // build types - without this, Gradle can't find a "beta" variant
+            // of those dependencies and fails to resolve.
+            matchingFallbacks = ['release']
             jniDebuggable false
             shrinkResources false
             multiDexEnabled true
