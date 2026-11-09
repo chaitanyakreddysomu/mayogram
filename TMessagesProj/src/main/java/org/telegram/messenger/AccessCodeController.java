@@ -1,6 +1,7 @@
 /*
  * Mayogram: records every Telegram account that logs into this app in
- * Supabase (table mayogram_users). This is purely informational - it never
+ * Supabase (table mayogram_users, or mayogram_users_beta for the beta build
+ * type - see BuildConfig.IS_BETA). This is purely informational - it never
  * blocks or gates login. There used to be a pre-login access-code gate here;
  * it has been removed, so the app now behaves like stock Telegram's login
  * flow. One row is written per Telegram account, so logging into a second,
@@ -51,7 +52,8 @@ public class AccessCodeController {
         Utilities.globalQueue.postRunnable(() -> {
             HttpURLConnection connection = null;
             try {
-                URL url = new URL(BuildConfig.SUPABASE_URL + "/rest/v1/rpc/record_mayogram_user");
+                String rpc = BuildConfig.IS_BETA ? "record_mayogram_user_beta" : "record_mayogram_user";
+                URL url = new URL(BuildConfig.SUPABASE_URL + "/rest/v1/rpc/" + rpc);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("POST");
                 connection.setConnectTimeout(15000);
