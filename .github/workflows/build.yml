@@ -45,8 +45,11 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/beta" ]; then
             echo "name=beta" >> "$GITHUB_OUTPUT"
-            echo "gradle_task=:TMessagesProj_App:assembleAfatBeta" >> "$GITHUB_OUTPUT"
-            echo "apk_dir=TMessagesProj_App/build/outputs/apk/afat/beta" >> "$GITHUB_OUTPUT"
+            # phoneAfat (not afat): beta only ships arm64-v8a/armeabi-v7a -
+            # testers install on real phones, never emulators - which also
+            # roughly halves native build+link+package time in CI.
+            echo "gradle_task=:TMessagesProj_App:assemblePhoneAfatBeta" >> "$GITHUB_OUTPUT"
+            echo "apk_dir=TMessagesProj_App/build/outputs/apk/phoneAfat/beta" >> "$GITHUB_OUTPUT"
           else
             echo "name=release" >> "$GITHUB_OUTPUT"
             echo "gradle_task=:TMessagesProj_App:assembleAfatRelease" >> "$GITHUB_OUTPUT"
@@ -123,8 +126,23 @@ jobs:
           # longer exists in the SDK repository and fails the install.
           packages: platform-tools
 
+      # The NDK/build-tools/cmake install (~1.5-2GB download+unpack) is the
+      # same on every run since versions are pinned below - cache it keyed on
+      # those pinned versions so it's only downloaded once.
+      - name: Cache SDK packages
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/platforms
+            ${{ env.ANDROID_HOME }}/build-tools
+            ${{ env.ANDROID_HOME }}/ndk
+            ${{ env.ANDROID_HOME }}/cmake
+          key: sdk-android36-buildtools36.0.0-ndk27.2.12479018-cmake3.22.1
+
       # Versions are pinned by the project's build.gradle; keep them in step.
       - name: Install SDK packages
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
         run: |
           sdkmanager --install \
             "platforms;android-36" \
