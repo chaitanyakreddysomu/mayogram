@@ -103,6 +103,13 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
     public final @NonNull RecyclerListView botsSearchListView;
     public DialogsBotsAdapter botsSearchAdapter;
 
+    private DefaultItemAnimator globalItemAnimator;
+    public FrameLayout globalSearchContainer;
+    public StickerEmptyView globalEmptyView;
+    private LinearLayoutManager globalSearchLayoutManager;
+    public RecyclerListView globalSearchListView;
+    public DialogsGlobalAdapter globalSearchAdapter;
+
     public boolean postsAreNew;
     public final @NonNull PostsSearchContainer postsSearchContainer;
 
@@ -529,6 +536,79 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         });
         botsSearchListView.addEdgeEffectListener(this::invalidateBlur);
 
+        globalSearchContainer = new FrameLayout(context);
+
+        globalItemAnimator = new DefaultItemAnimator() {
+            @Override
+            protected void onMoveAnimationUpdate(RecyclerView.ViewHolder holder) {
+                super.onMoveAnimationUpdate(holder);
+                invalidate();
+            }
+        };
+        globalItemAnimator.setSupportsChangeAnimations(false);
+        globalItemAnimator.setDelayAnimations(false);
+        globalItemAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
+        globalItemAnimator.setDurations(350);
+
+        globalSearchListView = new RecyclerListView(context);
+        globalSearchListView.setItemAnimator(globalItemAnimator);
+        globalSearchListView.setPivotY(0);
+        globalSearchListView.setVerticalScrollBarEnabled(true);
+        globalSearchListView.setInstantClick(true);
+        globalSearchListView.setVerticalScrollbarPosition(LocaleController.isRTL ? RecyclerListView.SCROLLBAR_POSITION_LEFT : RecyclerListView.SCROLLBAR_POSITION_RIGHT);
+        globalSearchListView.setLayoutManager(globalSearchLayoutManager = new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
+        globalSearchListView.setAnimateEmptyView(true, RecyclerListView.EMPTY_VIEW_ANIMATION_TYPE_ALPHA);
+        globalSearchListView.setClipToPadding(false);
+
+        loadingView = new FlickerLoadingView(context);
+        loadingView.setViewType(1);
+        globalEmptyView = new StickerEmptyView(context, loadingView, StickerEmptyView.STICKER_TYPE_SEARCH) {
+            @Override
+            public void setVisibility(int visibility) {
+                if (noMediaFiltersSearchView.getTag() != null) {
+                    super.setVisibility(View.GONE);
+                    return;
+                }
+                super.setVisibility(visibility);
+            }
+        };
+        globalEmptyView.title.setText(getString(R.string.NoResult));
+        globalEmptyView.subtitle.setVisibility(View.GONE);
+        globalEmptyView.setVisibility(View.GONE);
+        globalEmptyView.addView(loadingView, 0);
+        globalEmptyView.showProgress(true, false);
+        globalSearchContainer.addView(globalEmptyView);
+        globalSearchContainer.addView(globalSearchListView);
+        globalSearchListView.setEmptyView(globalEmptyView);
+        globalSearchListView.setAdapter(globalSearchAdapter = new DialogsGlobalAdapter(globalSearchListView, context, currentAccount, folderId, null) {
+            @Override
+            public void update(boolean animated) {
+                super.update(animated);
+                globalEmptyView.showProgress(loadingMessages || loadingPeers || messages == null || !messages.isEmpty() || searchPeers == null || !searchPeers.isEmpty(), animated);
+                globalEmptyView.title.setText(getString(R.string.NoResult));
+                globalEmptyView.subtitle.setVisibility(View.GONE);
+            }
+
+            @Override
+            protected void hideKeyboard() {
+                AndroidUtilities.hideKeyboard(fragment.getParentActivity().getCurrentFocus());
+            }
+        });
+        globalSearchListView.setOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    AndroidUtilities.hideKeyboard(fragment.getParentActivity().getCurrentFocus());
+                }
+            }
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                globalSearchAdapter.checkBottom();
+                onPageScrolled(dx, dy);
+            }
+        });
+        globalSearchListView.addEdgeEffectListener(this::invalidateBlur);
+
         hashtagSearchContainer = new FrameLayout(context);
 
         hashtagItemAnimator = new DefaultItemAnimator() {
@@ -711,7 +791,10 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             collapsePublicPosts();
         }
 
-        if (view == channelsSearchContainer) {
+        if (view == globalSearchContainer) {
+            globalSearchAdapter.search(query);
+            globalEmptyView.setKeyboardHeight(keyboardSize, false);
+        } else if (view == channelsSearchContainer) {
             MessagesController.getInstance(currentAccount).getChannelRecommendations(0);
             channelsSearchAdapter.search(query);
             channelsEmptyView.setKeyboardHeight(keyboardSize, false);
@@ -1287,6 +1370,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             }
         }
 
+        setPagesPaddings(globalSearchContainer, globalSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         setPagesPaddings(channelsSearchContainer, channelsSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         setPagesPaddings(botsSearchContainer, botsSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         setPagesPaddings(hashtagSearchContainer, hashtagSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
@@ -1330,6 +1414,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 ((SearchDownloadsContainer) getChildAt(i)).setKeyboardHeight(keyboardSize, animated);
             } else if (getChildAt(i) == channelsSearchContainer) {
                 channelsEmptyView.setKeyboardHeight(keyboardSize, animated);
+            } else if (getChildAt(i) == globalSearchContainer) {
+                globalEmptyView.setKeyboardHeight(keyboardSize, animated);
             }
         }
     }
@@ -1469,7 +1555,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
     }
 
     public void showDownloads() {
-        setPosition((expandedPublicPosts ? 1 : 0) + 5);
+        // +1 for the Global tab, which always sits right after Dialogs.
+        setPosition((expandedPublicPosts ? 1 : 0) + 1 + 5);
     }
 
     public int getPositionForType(int initialSearchType) {
@@ -1487,6 +1574,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             return null;
         } else if (page == searchContainer) {
             return searchListView;
+        } else if (page == globalSearchContainer) {
+            return globalSearchListView;
         } else if (page == channelsSearchContainer) {
             return channelsSearchListView;
         } else if (page == botsSearchContainer) {
@@ -1533,6 +1622,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         private final static int BOTS_TYPE = 4;
         private final static int PUBLIC_POSTS_TYPE = 5;
         private final static int POSTS_TYPE = 6;
+        private final static int GLOBAL_TYPE = 7;
 
         public ViewPagerAdapter() {
             updateItems();
@@ -1544,6 +1634,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             if (communityId != 0) {
                 return;
             }
+            items.add(new Item(GLOBAL_TYPE));
 
             if (expandedPublicPosts) {
                 items.add(new Item(PUBLIC_POSTS_TYPE));
@@ -1587,6 +1678,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 } else {
                     return getString(R.string.SearchPosts);
                 }
+            } else if (items.get(position).type == GLOBAL_TYPE) {
+                return getString(R.string.GlobalSearch);
             } else if (items.get(position).type == DOWNLOADS_TYPE) {
                 return getString(R.string.DownloadsTabs);
             } else if (items.get(position).type == PUBLIC_POSTS_TYPE) {
@@ -1627,6 +1720,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 return downloadsContainer;
             } else if (viewType == 6) {
                 return postsSearchContainer;
+            } else if (viewType == 7) {
+                return globalSearchContainer;
             } else {
                 FilteredSearchView filteredSearchView = new FilteredSearchView(parent);
                 filteredSearchView.setChatPreviewDelegate(chatPreviewDelegate);
@@ -1667,6 +1762,9 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             }
             if (items.get(position).type == POSTS_TYPE) {
                 return 6;
+            }
+            if (items.get(position).type == GLOBAL_TYPE) {
+                return 7;
             }
             return items.get(position).type + position;
         }
