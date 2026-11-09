@@ -19373,7 +19373,7 @@ public class ChatActivity extends BaseFragment implements
                         cantDeleteMessagesCount--;
                     }
                     boolean noforwards = false;
-                    if (chatMode == MODE_SCHEDULED || !messageObject.canForwardMessage() || noforwards || mayoForwardBlocked()) {
+                    if (chatMode == MODE_SCHEDULED || !messageObject.canForwardMessage() || noforwards) {
                         cantForwardMessagesCount--;
                     } else {
                         canForwardMessagesCount--;
@@ -19411,7 +19411,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                     boolean noforwards = false;
 
-                    if (chatMode == MODE_SCHEDULED || !messageObject.canForwardMessage() || noforwards || mayoForwardBlocked()) {
+                    if (chatMode == MODE_SCHEDULED || !messageObject.canForwardMessage() || noforwards) {
                         cantForwardMessagesCount++;
                     } else {
                         canForwardMessagesCount++;
@@ -46561,8 +46561,7 @@ public class ChatActivity extends BaseFragment implements
                     && !message.isExpiredStory()
                     && message.type != MessageObject.TYPE_STORY_MENTION
                     && message.type != MessageObject.TYPE_GIFT_STARS
-                    && !selectedObject.isMusicNotCachedInProtectedChat()
-                    && !mayoForwardBlocked();
+                    && !selectedObject.isMusicNotCachedInProtectedChat();
                 if (canForward) {
                     items.add(LocaleController.getString(R.string.Forward));
                     options.add(OPTION_FORWARD);
@@ -47348,26 +47347,6 @@ public class ChatActivity extends BaseFragment implements
         //     getMessagesController().isUserNoForwards(userInfo);
 
         return false;
-    }
-
-    /**
-     * Mayogram: whether the Forward option should be disabled for this
-     * chat right now. Deliberately separate from isPeerNoForwards() above
-     * (which stays hardcoded false everywhere - copy, screenshot blocking,
-     * save/download, etc. all remain unrestricted for everyone, unchanged)
-     * - this is the ONLY thing full_access gates. True only when the chat
-     * is actually forward-restricted AND this account lacks full_access
-     * (see AccessCodeController.hasFullAccess, refreshed from the
-     * mayogram_users table on every app open).
-     */
-    private boolean mayoForwardBlocked() {
-        boolean restricted = currentChat != null
-                ? getMessagesController().isChatNoForwards(currentChat)
-                : getMessagesController().isUserNoForwards(userInfo);
-        if (!restricted) {
-            return false;
-        }
-        return !org.telegram.messenger.AccessCodeController.hasFullAccess(getUserConfig().getClientUserId());
     }
 
     private PollAddOptionFieldLayout pollAddOptionFieldLayout;

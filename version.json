@@ -1,9 +1,10 @@
 {
   "latestVersion": "2.0.0",
   "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.0.0/app.apk",
-  "changelog": "v2.0.0 - Added full access support for forwarding in restricted chats",
+  "changelog": "v2.0.0 - Restyled the forwarding progress bar to match the app's native look",
   "features": [
-    "Accounts with full access can now forward messages even in chats that normally block forwarding",
-    "Everyone else keeps the normal Telegram forwarding rules, exactly as before"
+    "The forwarding progress bar now uses the same rounded, glass-style look as the message box",
+    "It sits right above the message box at the same width, instead of stretching edge to edge",
+    "The Cancel text now uses the app's accent color, matching other buttons in the input area"
   ]
 }

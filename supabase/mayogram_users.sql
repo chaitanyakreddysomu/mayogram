@@ -26,18 +26,9 @@ create table if not exists public.mayogram_users (
     last_name text,
     phone text,
 
-    -- When true, this account can forward from/save content in
-    -- forward-restricted ("Content Protection") chats. Every new row starts
-    -- false (the default) - the app never sets this itself, only
-    -- admin_set_full_access below does.
-    full_access boolean not null default false,
-
     first_login_at timestamptz not null default now(),
     last_login_at timestamptz not null default now()
 );
-
--- Safe to re-run against a table created before this column existed.
-alter table public.mayogram_users add column if not exists full_access boolean not null default false;
 
 create index if not exists mayogram_users_telegram_user_id_idx
     on public.mayogram_users (telegram_user_id);
@@ -86,37 +77,6 @@ grant execute on function public.record_mayogram_user(bigint, text, text, text, 
 
 
 -- ---------------------------------------------------------------------------
--- Called by the app once per logged-in account on every app open (not
--- cached across launches - a revoke here should take effect next time the
--- app is opened, not require a re-login). Returns false, never an error,
--- for an unrecorded telegram_user_id.
--- ---------------------------------------------------------------------------
-create or replace function public.get_mayogram_full_access(p_telegram_user_id bigint)
-returns boolean
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-    v_full_access boolean;
-begin
-    if p_telegram_user_id is null then
-        return false;
-    end if;
-
-    select full_access into v_full_access
-      from public.mayogram_users
-     where telegram_user_id = p_telegram_user_id;
-
-    return coalesce(v_full_access, false);
-end;
-$$;
-
-revoke all on function public.get_mayogram_full_access(bigint) from public;
-grant execute on function public.get_mayogram_full_access(bigint) to anon, authenticated;
-
-
--- ---------------------------------------------------------------------------
 -- Admin: list every recorded account (password-protected, like admin_api.sql's
 -- other admin_* calls - reuses the same public.admin_check(password) helper).
 -- ---------------------------------------------------------------------------
@@ -128,7 +88,6 @@ returns table (
     first_name        text,
     last_name         text,
     phone             text,
-    full_access       boolean,
     first_login_at    timestamptz,
     last_login_at     timestamptz
 )
@@ -143,7 +102,7 @@ begin
 
     return query
         select u.id, u.telegram_user_id, u.username, u.first_name, u.last_name,
-               u.phone, u.full_access, u.first_login_at, u.last_login_at
+               u.phone, u.first_login_at, u.last_login_at
           from public.mayogram_users u
          order by u.last_login_at desc;
 end;
@@ -151,34 +110,6 @@ $$;
 
 revoke all on function public.admin_list_mayogram_users(text) from public;
 grant execute on function public.admin_list_mayogram_users(text) to anon, authenticated;
-
-
--- ---------------------------------------------------------------------------
--- Admin: grant/revoke full_access for one account (password-protected).
--- ---------------------------------------------------------------------------
-create or replace function public.admin_set_full_access(
-    p_password          text,
-    p_telegram_user_id   bigint,
-    p_full_access        boolean
-)
-returns void
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-begin
-    if not public.admin_check(p_password) then
-        raise exception 'unauthorized';
-    end if;
-
-    update public.mayogram_users
-       set full_access = p_full_access
-     where telegram_user_id = p_telegram_user_id;
-end;
-$$;
-
-revoke all on function public.admin_set_full_access(text, bigint, boolean) from public;
-grant execute on function public.admin_set_full_access(text, bigint, boolean) to anon, authenticated;
 
 -- Handy query in the SQL editor:
 --   select telegram_user_id, username, first_name, last_name, phone, last_login_at

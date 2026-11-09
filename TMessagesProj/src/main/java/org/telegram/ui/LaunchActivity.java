@@ -410,14 +410,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         AndroidUtilities.checkDisplaySize(this, getResources().getConfiguration());
         currentAccount = UserConfig.selectedAccount;
         registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-        // Mayogram: re-check full_access for every logged-in account on
-        // every cold start (never reused from a previous run) - see
-        // AccessCodeController.refreshFullAccess.
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (UserConfig.getInstance(a).isClientActivated()) {
-                org.telegram.messenger.AccessCodeController.refreshFullAccess(UserConfig.getInstance(a).getClientUserId());
-            }
-        }
         if (!UserConfig.getInstance(currentAccount).isClientActivated()) {
             Intent intent = getIntent();
             boolean isProxy = false;
