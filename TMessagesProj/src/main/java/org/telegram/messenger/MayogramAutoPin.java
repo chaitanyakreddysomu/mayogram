@@ -3,7 +3,9 @@
  * very top, unpinnably) every channel in the server-controlled "official
  * channels" list - see supabase/official_channels.sql. The list itself can
  * be changed from Supabase at any time (add/remove channels, toggle
- * pinning) without an app update.
+ * pinning) without an app update. Every official channel is also added to a
+ * local "mayogram" folder (chat filter), created automatically if it
+ * doesn't exist yet.
  *
  * Runs once per login (see the call site in LoginActivity's onAuthSuccess),
  * best-effort throughout - any failure (no network, Supabase not
@@ -32,7 +34,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MayogramAutoPin {
 
@@ -177,6 +181,7 @@ public class MayogramAutoPin {
         long dialogId = -chat.id;
         MessagesController controller = MessagesController.getInstance(account);
         if (controller.getDialog(dialogId) != null) {
+            addToMayogramFolder(account, dialogId);
             if (pinToTop) {
                 pinAndSync(account, dialogId, 0);
             }
@@ -193,11 +198,134 @@ public class MayogramAutoPin {
                 if (response instanceof TLRPC.Updates) {
                     controller.processUpdates((TLRPC.Updates) response, false);
                 }
+                addToMayogramFolder(account, dialogId);
                 if (pinToTop) {
                     pinAndSync(account, dialogId, 0);
                 }
             });
         });
+    }
+
+    // ---------------------------------------------------------------------
+    // "mayogram" folder: every official channel also gets added to a local
+    // chat filter named "mayogram", created on first use. Channels resolve
+    // one at a time (staggered above), so additions are batched into one
+    // debounced TL_messages_updateDialogFilter call per login instead of one
+    // per channel.
+    // ---------------------------------------------------------------------
+
+    private static final String FOLDER_NAME = "mayogram";
+    private static final Map<Integer, Set<Long>> pendingFolderDialogs = new ConcurrentHashMap<>();
+    private static final Map<Integer, Runnable> pendingFolderSync = new ConcurrentHashMap<>();
+
+    private static void addToMayogramFolder(int account, long dialogId) {
+        Set<Long> pending = pendingFolderDialogs.computeIfAbsent(account, a -> new HashSet<>());
+        synchronized (pending) {
+            pending.add(dialogId);
+        }
+        Runnable previous = pendingFolderSync.get(account);
+        if (previous != null) {
+            AndroidUtilities.cancelRunOnUIThread(previous);
+        }
+        Runnable sync = () -> syncMayogramFolder(account);
+        pendingFolderSync.put(account, sync);
+        AndroidUtilities.runOnUIThread(sync, 800);
+    }
+
+    private static void syncMayogramFolder(int account) {
+        pendingFolderSync.remove(account);
+        Set<Long> pending = pendingFolderDialogs.remove(account);
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+
+        MessagesController controller = MessagesController.getInstance(account);
+        MessagesController.DialogFilter filter = null;
+        for (MessagesController.DialogFilter f : controller.getDialogFilters()) {
+            if (!f.isDefault() && FOLDER_NAME.equalsIgnoreCase(f.name)) {
+                filter = f;
+                break;
+            }
+        }
+        final boolean creatingNew = filter == null;
+        if (creatingNew) {
+            filter = new MessagesController.DialogFilter();
+            filter.name = FOLDER_NAME;
+            filter.id = 2;
+            while (controller.dialogFiltersById.get(filter.id) != null) {
+                filter.id++;
+            }
+            filter.order = controller.getDialogFilters().size();
+            filter.pendingUnreadCount = filter.unreadCount = -1;
+        }
+        final MessagesController.DialogFilter finalFilter = filter;
+
+        boolean changed = false;
+        for (Long dialogId : pending) {
+            if (!finalFilter.alwaysShow.contains(dialogId)) {
+                finalFilter.alwaysShow.add(dialogId);
+                changed = true;
+            }
+        }
+        if (!changed && !creatingNew) {
+            return;
+        }
+
+        TLRPC.TL_messages_updateDialogFilter req = new TLRPC.TL_messages_updateDialogFilter();
+        req.id = finalFilter.id;
+        req.flags |= 1;
+        req.filter = new TLRPC.TL_dialogFilter();
+        req.filter.id = finalFilter.id;
+        req.filter.title = new TLRPC.TL_textWithEntities();
+        req.filter.title.text = finalFilter.name;
+        for (Long dialogId : finalFilter.alwaysShow) {
+            TLRPC.InputPeer inputPeer = toInputPeer(controller, dialogId);
+            if (inputPeer != null) {
+                req.filter.include_peers.add(inputPeer);
+            }
+        }
+
+        ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
+            if (error != null) {
+                FileLog.e("MayogramAutoPin: updateDialogFilter failed: " + error.code + " " + error.text);
+                return;
+            }
+            AndroidUtilities.runOnUIThread(() -> {
+                if (creatingNew) {
+                    controller.addFilter(finalFilter, false);
+                } else {
+                    controller.onFilterUpdate(finalFilter);
+                }
+                MessagesStorage.getInstance(account).saveDialogFilter(finalFilter, false, true);
+                NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.dialogFiltersUpdated);
+            });
+        });
+    }
+
+    private static TLRPC.InputPeer toInputPeer(MessagesController controller, long dialogId) {
+        if (dialogId > 0) {
+            TLRPC.User user = controller.getUser(dialogId);
+            if (user == null) {
+                return null;
+            }
+            TLRPC.TL_inputPeerUser inputPeer = new TLRPC.TL_inputPeerUser();
+            inputPeer.user_id = dialogId;
+            inputPeer.access_hash = user.access_hash;
+            return inputPeer;
+        }
+        TLRPC.Chat chat = controller.getChat(-dialogId);
+        if (chat == null) {
+            return null;
+        }
+        if (ChatObject.isChannel(chat)) {
+            TLRPC.TL_inputPeerChannel inputPeer = new TLRPC.TL_inputPeerChannel();
+            inputPeer.channel_id = -dialogId;
+            inputPeer.access_hash = chat.access_hash;
+            return inputPeer;
+        }
+        TLRPC.TL_inputPeerChat inputPeer = new TLRPC.TL_inputPeerChat();
+        inputPeer.chat_id = -dialogId;
+        return inputPeer;
     }
 
     /**
