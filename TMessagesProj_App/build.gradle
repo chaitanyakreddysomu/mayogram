@@ -111,6 +111,9 @@ android {
             multiDexEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
+            // Overrides the library's @string/AppName just for this build
+            // type - shows as "Mayogram Beta" under the launcher icon.
+            resValue "string", "AppName", "mayogram-beta"
         }
     }
 

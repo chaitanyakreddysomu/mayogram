@@ -3524,7 +3524,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo_2).mutate();
                 logoDrawable.setBounds(0, dp(2), logoDrawable.getIntrinsicWidth(), dp(2) + logoDrawable.getIntrinsicHeight());
                 logoDrawable.setColorFilter(getThemedColor(Theme.key_telegram_color_dialogsLogo), PorterDuff.Mode.MULTIPLY);
-                SpannableStringBuilder ssb = new SpannableStringBuilder(getHomeTitleText());
+                CharSequence homeTitle = getHomeTitleText();
+                if (org.telegram.messenger.BuildConfig.IS_BETA) {
+                    homeTitle = org.telegram.ui.Components.BetaPillSpan.applySpan(homeTitle);
+                }
+                SpannableStringBuilder ssb = new SpannableStringBuilder(homeTitle);
                 actionBar.setTitle(ssb, statusDrawable);
                 updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
             }
@@ -13713,7 +13717,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private void updateGhostModeTitle() {
         if (actionBar != null && folderId == 0 && communityId == 0) {
-            actionBar.setTitle(new SpannableStringBuilder(getHomeTitleText()), statusDrawable);
+            CharSequence homeTitle = getHomeTitleText();
+            if (org.telegram.messenger.BuildConfig.IS_BETA) {
+                homeTitle = org.telegram.ui.Components.BetaPillSpan.applySpan(homeTitle);
+            }
+            actionBar.setTitle(new SpannableStringBuilder(homeTitle), statusDrawable);
         }
     }
 
