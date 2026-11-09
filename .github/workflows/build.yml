@@ -150,16 +150,16 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # Beta builds get their own version string/code each run, computed from
-      # a run number rather than a manual gradle.properties bump - this file
-      # change is never committed, so it doesn't affect the real release
-      # version. The sed'd gradle.properties only exists in this job's
-      # workspace for the duration of the build.
+      # BETA_VERSION_NAME/BETA_VERSION_CODE (independent of the release
+      # version) plus a run number - this file change is never committed, so
+      # it doesn't affect the real release version. The sed'd gradle.properties
+      # only exists in this job's workspace for the duration of the build.
       - name: Bump beta version
         if: steps.channel.outputs.name == 'beta'
         id: beta-version
         run: |
-          baseName=$(grep '^APP_VERSION_NAME=' gradle.properties | cut -d= -f2)
-          baseCode=$(grep '^APP_VERSION_CODE=' gradle.properties | cut -d= -f2)
+          baseName=$(grep '^BETA_VERSION_NAME=' gradle.properties | cut -d= -f2)
+          baseCode=$(grep '^BETA_VERSION_CODE=' gradle.properties | cut -d= -f2)
           betaName="${baseName}-beta.${{ github.run_number }}"
           betaCode=$((baseCode * 100000 + ${{ github.run_number }}))
           sed -i "s/^APP_VERSION_NAME=.*/APP_VERSION_NAME=${betaName}/" gradle.properties
