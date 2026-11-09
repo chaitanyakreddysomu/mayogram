@@ -2,7 +2,7 @@ name: Build Android
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, beta ]
   pull_request:
   workflow_dispatch:
 
@@ -35,6 +35,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      # The beta branch builds the separate "beta" build type/channel instead
+      # of "release" - own applicationId, own update-check URL (version-beta.json
+      # instead of version.json) - so pushing beta builds never notifies or
+      # affects main/release users.
+      - name: Determine channel
+        id: channel
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/beta" ]; then
+            echo "name=beta" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=:TMessagesProj_App:assembleAfatBeta" >> "$GITHUB_OUTPUT"
+            echo "apk_dir=TMessagesProj_App/build/outputs/apk/afat/beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=release" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=:TMessagesProj_App:assembleAfatRelease" >> "$GITHUB_OUTPUT"
+            echo "apk_dir=TMessagesProj_App/build/outputs/apk/afat/release" >> "$GITHUB_OUTPUT"
+          fi
 
       # Compiling jni/ for four ABIs is most of the build time, and it rarely
       # changes. The stripped libtmessages.49.so files are cached, keyed on the git
@@ -132,10 +149,27 @@ jobs:
             echo "ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}"
           } >> "$GITHUB_ENV"
 
-      - name: Build release APK
+      # Beta builds get their own version string/code each run, computed from
+      # a run number rather than a manual gradle.properties bump - this file
+      # change is never committed, so it doesn't affect the real release
+      # version. The sed'd gradle.properties only exists in this job's
+      # workspace for the duration of the build.
+      - name: Bump beta version
+        if: steps.channel.outputs.name == 'beta'
+        id: beta-version
+        run: |
+          baseName=$(grep '^APP_VERSION_NAME=' gradle.properties | cut -d= -f2)
+          baseCode=$(grep '^APP_VERSION_CODE=' gradle.properties | cut -d= -f2)
+          betaName="${baseName}-beta.${{ github.run_number }}"
+          betaCode=$((baseCode * 100000 + ${{ github.run_number }}))
+          sed -i "s/^APP_VERSION_NAME=.*/APP_VERSION_NAME=${betaName}/" gradle.properties
+          sed -i "s/^APP_VERSION_CODE=.*/APP_VERSION_CODE=${betaCode}/" gradle.properties
+          echo "version=$betaName" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
         run: |
           ./gradlew \
-            :TMessagesProj_App:assembleAfatRelease --stacktrace
+            ${{ steps.channel.outputs.gradle_task }} --stacktrace
 
       # Best effort: a failure here only means the next run builds natively again.
       - name: Collect native libraries for cache
@@ -164,33 +198,72 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mayogram-release-apk
-          path: TMessagesProj_App/build/outputs/apk/afat/release/*.apk
+          name: mayogram-${{ steps.channel.outputs.name }}-apk
+          path: ${{ steps.channel.outputs.apk_dir }}/*.apk
           if-no-files-found: error
 
       # Auto-publish a GitHub Release for every build on main/master, tagged
       # from gradle.properties' APP_VERSION_NAME. version.json's downloadUrl
       # expects the asset to be named app.apk, so it's copied to that name
       # before upload. Skipped for pull requests - those just keep the
-      # workflow artifact above.
+      # workflow artifact above. Beta pushes use the separate steps below
+      # instead, so they never touch version.json or the v* release tags.
       - name: Read app version
-        if: github.event_name != 'pull_request'
+        if: steps.channel.outputs.name == 'release' && github.event_name != 'pull_request'
         id: app-version
         run: |
           version=$(grep '^APP_VERSION_NAME=' gradle.properties | cut -d= -f2)
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Prepare release APK
-        if: github.event_name != 'pull_request'
+        if: steps.channel.outputs.name == 'release' && github.event_name != 'pull_request'
         run: |
           apk=$(find TMessagesProj_App/build/outputs/apk/afat/release -name '*.apk' | head -n 1)
           cp "$apk" app.apk
 
       - name: Create GitHub Release
-        if: github.event_name != 'pull_request'
+        if: steps.channel.outputs.name == 'release' && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.app-version.outputs.version }}
           name: v${{ steps.app-version.outputs.version }}
           generate_release_notes: true
           files: app.apk
+
+      # Beta channel: published as a pre-release (never shows as "Latest"),
+      # and version-beta.json is rewritten and pushed straight back to the
+      # beta branch so every push notifies beta testers automatically. This
+      # push is authenticated with the default GITHUB_TOKEN, which GitHub
+      # never uses to re-trigger push-triggered workflows, so it can't loop.
+      - name: Prepare beta APK
+        if: steps.channel.outputs.name == 'beta' && github.event_name != 'pull_request'
+        run: |
+          apk=$(find ${{ steps.channel.outputs.apk_dir }} -name '*.apk' | head -n 1)
+          cp "$apk" app-beta.apk
+
+      - name: Create GitHub beta pre-release
+        if: steps.channel.outputs.name == 'beta' && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: beta-v${{ steps.beta-version.outputs.version }}
+          name: Beta v${{ steps.beta-version.outputs.version }}
+          prerelease: true
+          generate_release_notes: true
+          files: app-beta.apk
+
+      - name: Update version-beta.json
+        if: steps.channel.outputs.name == 'beta' && github.event_name != 'pull_request'
+        run: |
+          cat > version-beta.json <<EOF
+          {
+            "latestVersion": "${{ steps.beta-version.outputs.version }}",
+            "downloadUrl": "https://github.com/${{ github.repository }}/releases/download/beta-v${{ steps.beta-version.outputs.version }}/app-beta.apk",
+            "changelog": "Beta build from commit ${{ github.sha }}",
+            "features": []
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version-beta.json
+          git commit -m "Update version-beta.json for beta v${{ steps.beta-version.outputs.version }}"
+          git push origin beta || (git pull --rebase origin beta && git push origin beta)

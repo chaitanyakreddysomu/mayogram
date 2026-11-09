@@ -10,6 +10,10 @@
  *   "downloadUrl": "https://github.com/<user>/<repo>/releases/download/v1.1/app.apk",
  *   "changelog": "- Fixed bugs\n- New features"
  * }
+ *
+ * The beta build type (BuildConfig.IS_BETA) checks a separate file/channel
+ * (version-beta.json on the beta branch) instead, so pushing beta builds
+ * never notifies release users and vice versa.
  */
 
 package org.telegram.messenger;
@@ -39,7 +43,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class AppUpdateController {
 
-    public static final String VERSION_URL = "https://raw.githubusercontent.com/chaitanyakreddysomu/mayogram/main/version.json";
+    public static final String VERSION_URL = BuildConfig.IS_BETA
+            ? "https://raw.githubusercontent.com/chaitanyakreddysomu/mayogram/beta/version-beta.json"
+            : "https://raw.githubusercontent.com/chaitanyakreddysomu/mayogram/main/version.json";
 
     private static final String PREF_DOWNLOADED_VERSION = "mayo_update_downloaded_version";
     private static final int DOWNLOAD_ATTEMPTS = 3;

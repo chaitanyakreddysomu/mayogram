@@ -167,6 +167,11 @@ android {
         buildConfigField "String", "SUPABASE_URL", "\"" + getSecret("SUPABASE_URL", "SUPABASE_URL", "") + "\""
         buildConfigField "String", "SUPABASE_ANON_KEY", "\"" + getSecret("SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "") + "\""
 
+        // Mayogram: true only for the "beta" build type (CI-built from the
+        // beta branch) - picks a separate update-check URL/channel so beta
+        // testers never affect, or get affected by, the main release channel.
+        buildConfigField "boolean", "IS_BETA", "false"
+
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 
         multiDexEnabled true
@@ -257,6 +262,24 @@ android {
             buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
             buildConfigField "boolean", "BUNDLE", "false"
             buildConfigField "int", "VERSION_NUM", "7"
+        }
+
+        // Mayogram: distributed to testers only, from the beta branch's CI
+        // workflow - a signed, optimized build like release, but on its own
+        // update channel (IS_BETA) and its own applicationId suffix so it can
+        // be installed side by side with the main release build.
+        beta {
+            jniDebuggable false
+            shrinkResources false
+            multiDexEnabled true
+            ndk.debugSymbolLevel = 'FULL'
+            buildConfigField "String", "BUILD_VERSION_STRING", "\"" + APP_VERSION_NAME + "\""
+            buildConfigField "String", "BETA_URL", "\"\""
+            buildConfigField "boolean", "DEBUG_VERSION", "false"
+            buildConfigField "boolean", "DEBUG_PRIVATE_VERSION", "false"
+            buildConfigField "boolean", "BUNDLE", "false"
+            buildConfigField "boolean", "IS_BETA", "true"
+            buildConfigField "int", "VERSION_NUM", "8"
         }
     }
 

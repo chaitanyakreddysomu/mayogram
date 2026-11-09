@@ -98,6 +98,20 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
         }
+
+        // Mayogram: beta/tester channel, built by CI from the beta branch.
+        // Own applicationId suffix so it installs alongside the release app.
+        beta {
+            debuggable false
+            jniDebuggable false
+            signingConfig signingConfigs.release
+            applicationIdSuffix ".beta"
+            minifyEnabled true
+            shrinkResources true
+            multiDexEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), '../TMessagesProj/proguard-rules.pro'
+            ndk.debugSymbolLevel = 'FULL'
+        }
     }
 
     sourceSets.debug {
@@ -109,6 +123,10 @@ android {
     }
 
     sourceSets.release {
+        manifest.srcFile '../TMessagesProj/config/release/AndroidManifest.xml'
+    }
+
+    sourceSets.beta {
         manifest.srcFile '../TMessagesProj/config/release/AndroidManifest.xml'
     }
 
@@ -148,6 +166,9 @@ android {
                 manifest.srcFile '../TMessagesProj/config/debug/AndroidManifest_SDK23.xml'
             }
             sourceSets.release {
+                manifest.srcFile '../TMessagesProj/config/release/AndroidManifest_SDK23.xml'
+            }
+            sourceSets.beta {
                 manifest.srcFile '../TMessagesProj/config/release/AndroidManifest_SDK23.xml'
             }
             sourceSets.standalone {
