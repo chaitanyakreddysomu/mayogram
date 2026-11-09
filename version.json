@@ -1,7 +1,7 @@
 {
-  "latestVersion": "1.7.0",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v1.7.0/app.apk",
-  "changelog": "v1.7.0 - Added full access support for forwarding in restricted chats",
+  "latestVersion": "2.0.0",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.0.0/app.apk",
+  "changelog": "v2.0.0 - Added full access support for forwarding in restricted chats",
   "features": [
     "Accounts with full access can now forward messages even in chats that normally block forwarding",
     "Everyone else keeps the normal Telegram forwarding rules, exactly as before"
