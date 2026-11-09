@@ -263,7 +263,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             }
         }
         avatarImageView.setContentDescription(getString(R.string.AccDescrProfilePicture));
-        avatarImageView.setRoundRadius(dp(21));
+        avatarImageView.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(dp(21)));
         addView(avatarImageView);
         if (avatarClickable) {
             final TLRPC.Chat chat = parentFragment != null ? parentFragment.getCurrentChat() : null;
@@ -1433,7 +1433,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
             } else {
                 avatarImageView.setForUserOrChat(chat, avatarDrawable);
             }
-            avatarImageView.setRoundRadius(ChatObject.isForum(chat) ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21));
+            avatarImageView.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(ChatObject.isForum(chat) ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21)));
         }
     }
 
@@ -1541,7 +1541,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                 avatarImageView.setAnimatedEmojiDrawable(null);
                 ForumUtilities.setMonoForumAvatar(currentAccount, chat, avatarDrawable, avatarImageView);
             }
-            avatarImageView.setRoundRadius(dp(21));
+            avatarImageView.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(dp(21)));
         } else if (chat != null) {
             avatarDrawable.setScaleSize(1f);
             avatarDrawable.setInfo(currentAccount, chat);
@@ -1553,7 +1553,7 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
                 } else {
                     avatarImageView.setForUserOrChat(chat, avatarDrawable);
                 }
-                avatarImageView.setRoundRadius(chat.forum ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21));
+                avatarImageView.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(chat.forum ? dp(ChatObject.hasStories(chat) ? 11 : 16) : dp(21)));
             }
         }
     }

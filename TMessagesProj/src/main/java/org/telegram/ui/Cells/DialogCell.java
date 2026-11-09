@@ -693,7 +693,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         Theme.createDialogsResources(context);
         drawMonoforumAvatar = false;
         drawCommunityAvatar = false;
-        avatarImage.setRoundRadius(dp(26));
+        avatarImage.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(dp(26)));
         for (int i = 0; i < thumbImage.length; ++i) {
             thumbImage[i] = new ImageReceiver(this);
             thumbImage[i].ignoreNotifications = true;
@@ -3223,7 +3223,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
             drawMonoforumAvatar = false;
             drawCommunityAvatar = false;
-            avatarImage.setRoundRadius(dp(26));
+            avatarImage.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(dp(26)));
             drawUnmute = false;
         } else {
             int oldUnreadCount = unreadCount;
@@ -3680,7 +3680,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 avatarRadius = dp(28);
             }
 
-            avatarImage.setRoundRadius(avatarRadius);
+            avatarImage.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius(avatarRadius));
         }
         if (!isTopic && (getMeasuredWidth() != 0 || getMeasuredHeight() != 0)) {
             rebuildLayout = true;

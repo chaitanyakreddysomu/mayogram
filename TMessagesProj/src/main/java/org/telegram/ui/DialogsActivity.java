@@ -13705,10 +13705,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (org.telegram.messenger.GhostModeController.isEnabled(currentAccount)) {
             return getString(R.string.GhostModeTitle);
         }
+        int titleMode = org.telegram.messenger.MayogramCustomization.getTitleMode();
+        if (titleMode == org.telegram.messenger.MayogramCustomization.TITLE_MODE_APP_NAME) {
+            return getString(R.string.AppName);
+        }
         TLRPC.User homeTitleUser = UserConfig.getInstance(currentAccount).getCurrentUser();
-        String homeTitleName = homeTitleUser != null
-                ? ContactsController.formatName(homeTitleUser.first_name, homeTitleUser.last_name)
-                : getString(R.string.AppName);
+        String homeTitleName;
+        if (homeTitleUser != null && titleMode == org.telegram.messenger.MayogramCustomization.TITLE_MODE_FIRST_NAME) {
+            homeTitleName = homeTitleUser.first_name;
+        } else {
+            homeTitleName = homeTitleUser != null
+                    ? ContactsController.formatName(homeTitleUser.first_name, homeTitleUser.last_name)
+                    : getString(R.string.AppName);
+        }
         if (TextUtils.isEmpty(homeTitleName)) {
             homeTitleName = getString(R.string.AppName);
         }

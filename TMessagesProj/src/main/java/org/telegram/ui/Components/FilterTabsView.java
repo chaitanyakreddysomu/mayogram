@@ -912,9 +912,8 @@ public class FilterTabsView extends FrameLayout {
         deletePaint.setStrokeWidth(dp(1.5f));
 
         selectorDrawable = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, null);
-        float rad = AndroidUtilities.dpf2(14);
-        selectorDrawable.setCornerRadii(new float[]{rad, rad, rad, rad, rad, rad, rad, rad});
         selectorDrawable.setColor(Theme.getColor(tabLineColorKey, resourcesProvider));
+        applyMayogramSelectorStyle();
 
         setHorizontalScrollBarEnabled(false);
         listView = new RecyclerListView(context) {
@@ -1318,6 +1317,7 @@ public class FilterTabsView extends FrameLayout {
         activeTextColorKey = active;
         unactiveTextColorKey = unactive;
         selectorDrawable.setColor(Theme.getColor(tabLineColorKey, resourcesProvider));
+        applyMayogramSelectorStyle();
         listView.setSelectorDrawableColor(Theme.getColor(selector, resourcesProvider));
 
         listView.invalidateViews();
@@ -1442,6 +1442,16 @@ public class FilterTabsView extends FrameLayout {
             invalidate();
         }
         return result;
+    }
+
+    /** Mayogram: applies the user's custom folder-bar pill color/radius, if set (Settings -> Customise). */
+    public void applyMayogramSelectorStyle() {
+        float rad = AndroidUtilities.dpf2(org.telegram.messenger.MayogramCustomization.getFolderBarRadiusDp());
+        selectorDrawable.setCornerRadii(new float[]{rad, rad, rad, rad, rad, rad, rad, rad});
+        int customColor = org.telegram.messenger.MayogramCustomization.getFolderBarColor();
+        if (customColor != 0) {
+            selectorDrawable.setColor(customColor);
+        }
     }
 
     private void drawSelector(Canvas canvas) {
