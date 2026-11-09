@@ -102,6 +102,12 @@ android {
         // Mayogram: beta/tester channel, built by CI from the beta branch.
         // Own applicationId suffix so it installs alongside the release app.
         beta {
+            // Needed here too, not just in TMessagesProj: Gradle resolves the
+            // whole dependency graph (including transitive media3 modules)
+            // using THIS module's own attribute schema, since this is the
+            // project whose configuration (afatBetaRuntimeClasspath) is
+            // actually being resolved.
+            matchingFallbacks = ['release']
             debuggable false
             jniDebuggable false
             signingConfig signingConfigs.release
