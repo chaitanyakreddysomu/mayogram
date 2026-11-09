@@ -750,6 +750,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         // Mayogram: Help section (Ask a Question / FAQ / Features / Privacy
         // Policy) removed - replaced with Mayogram + Support Us rows below.
         items.add(SettingCell.Factory.of(25, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_channel, "Mayogram"));
+        items.add(SettingCell.Factory.of(27, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_chat, "Customise"));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_gift, "Support Us ❤️"));
 
         if (SharedSettings.experimentalSettingsAllowed.get()) {
@@ -901,6 +902,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             case 25:
                 presentSettingFragment(new MayogramInfoActivity());
+                break;
+            case 27:
+                presentSettingFragment(new MayogramCustomizeActivity());
                 break;
             case 26:
                 Browser.openUrl(getContext(), "https://buymeatea.in/mayogram");
