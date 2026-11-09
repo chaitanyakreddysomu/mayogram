@@ -588,7 +588,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 MainTabsActivity mainTabsActivity = new MainTabsActivity();
                 actionBarLayout.addFragmentToStack(mainTabsActivity);
                 if (savedInstanceState == null) {
-                    org.telegram.messenger.MayogramUpdateNotice.maybeShowOnUpdate(currentAccount, this);
                     // Mayogram: also re-check the official-channels list on every cold
                     // start, not just on login - so an admin adding/changing a channel
                     // in Supabase takes effect for already-logged-in accounts too,

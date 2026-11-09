@@ -1,10 +1,9 @@
 {
-  "latestVersion": "2.0.0",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.0.0/app.apk",
-  "changelog": "v2.0.0 - Restyled the forwarding progress bar to match the app's native look",
+  "latestVersion": "2.0.1",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.0.1/app.apk",
+  "changelog": "v2.0.1 - The app no longer jumps into the mayogram chat by itself after updating",
   "features": [
-    "The forwarding progress bar now uses the same rounded, glass-style look as the message box",
-    "It sits right above the message box at the same width, instead of stretching edge to edge",
-    "The Cancel text now uses the app's accent color, matching other buttons in the input area"
+    "Opening the app after an update no longer automatically takes you into the mayogram chat",
+    "The mayogram channel still shows pinned at the top of your chat list as before"
   ]
 }
