@@ -794,6 +794,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
     private void onClick(UItem item, View view, int position, float x, float y) {
         if (item.id == MAYO_CHANNELS_COUNTER_ID) {
+            presentFragment(new MayogramChannelsGroupsListActivity());
             if (channelsCounterRefreshing) {
                 return;
             }

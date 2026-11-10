@@ -132,4 +132,47 @@ public class MayogramCustomization {
     public static void setMenuItemVisible(String key, boolean visible) {
         prefs().edit().putBoolean("mayo_menu_" + key, visible).apply();
     }
+
+    // --- Unique Followers scan result: per-account (unlike the settings
+    // above), since different logged-in accounts own different channels. ---
+
+    public static void saveFollowersResult(int account, int total, java.util.Set<Long> uniqueIds) {
+        StringBuilder sb = new StringBuilder();
+        for (long id : uniqueIds) {
+            if (sb.length() > 0) sb.append(',');
+            sb.append(id);
+        }
+        MessagesController.getMainSettings(account).edit()
+                .putInt("mayo_followers_total", total)
+                .putInt("mayo_followers_unique", uniqueIds.size())
+                .putLong("mayo_followers_last_scan", System.currentTimeMillis())
+                .putString("mayo_followers_ids", sb.toString())
+                .apply();
+    }
+
+    public static int getFollowersTotal(int account) {
+        return MessagesController.getMainSettings(account).getInt("mayo_followers_total", 0);
+    }
+
+    public static int getFollowersUnique(int account) {
+        return MessagesController.getMainSettings(account).getInt("mayo_followers_unique", 0);
+    }
+
+    public static long getFollowersLastScan(int account) {
+        return MessagesController.getMainSettings(account).getLong("mayo_followers_last_scan", 0);
+    }
+
+    public static java.util.ArrayList<Long> getFollowersIds(int account) {
+        String raw = MessagesController.getMainSettings(account).getString("mayo_followers_ids", "");
+        java.util.ArrayList<Long> result = new java.util.ArrayList<>();
+        if (!raw.isEmpty()) {
+            for (String part : raw.split(",")) {
+                try {
+                    result.add(Long.parseLong(part));
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        }
+        return result;
+    }
 }
