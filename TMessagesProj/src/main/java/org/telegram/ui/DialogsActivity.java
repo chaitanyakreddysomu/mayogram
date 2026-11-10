@@ -13827,29 +13827,35 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT));
             });
         });
-        io.addChecked(org.telegram.messenger.GhostModeController.isEnabled(currentAccount), R.drawable.ghost,
-                getString(R.string.GhostModeMenuItem), () -> {
-            boolean newValue = !org.telegram.messenger.GhostModeController.isEnabled(currentAccount);
-            org.telegram.messenger.GhostModeController.setEnabled(currentAccount, newValue, success -> {
-                if (!success) {
-                    BulletinFactory.of(this).createErrorBulletin(getString(R.string.GhostModeError)).show();
-                }
-                updateGhostModeTitle();
+        if (org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_HOME_GHOST_MODE)) {
+            io.addChecked(org.telegram.messenger.GhostModeController.isEnabled(currentAccount), R.drawable.ghost,
+                    getString(R.string.GhostModeMenuItem), () -> {
+                boolean newValue = !org.telegram.messenger.GhostModeController.isEnabled(currentAccount);
+                org.telegram.messenger.GhostModeController.setEnabled(currentAccount, newValue, success -> {
+                    if (!success) {
+                        BulletinFactory.of(this).createErrorBulletin(getString(R.string.GhostModeError)).show();
+                    }
+                    updateGhostModeTitle();
+                });
             });
-        });
+        }
         io.addGap();
-        io.add(R.drawable.outline_groups_24, getString(R.string.NewGroup), () -> {
-            Bundle args = new Bundle();
-            presentFragment(new GroupCreateActivity(args));
-        });
+        if (org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_HOME_NEW_GROUP)) {
+            io.add(R.drawable.outline_groups_24, getString(R.string.NewGroup), () -> {
+                Bundle args = new Bundle();
+                presentFragment(new GroupCreateActivity(args));
+            });
+        }
         io.add(R.drawable.outline_saved_24, getString(R.string.SavedMessages), () -> {
             Bundle args = new Bundle();
             args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
             presentFragment(new ChatActivity(args));
         });
-        io.add(R.drawable.msg_calendar2, getString(R.string.MayoScheduledMessages), () -> {
-            presentFragment(new org.telegram.ui.MayoScheduledDialogsActivity());
-        });
+        if (org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_HOME_SCHEDULED)) {
+            io.add(R.drawable.msg_calendar2, getString(R.string.MayoScheduledMessages), () -> {
+                presentFragment(new org.telegram.ui.MayoScheduledDialogsActivity());
+            });
+        }
         io.add(R.drawable.msg_download, "Updates", () -> {
             if (getParentActivity() != null) {
                 new org.telegram.ui.Components.AppUpdateSheet(getParentActivity()).show();

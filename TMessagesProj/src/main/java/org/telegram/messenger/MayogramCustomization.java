@@ -94,4 +94,42 @@ public class MayogramCustomization {
     public static void setLocalPremiumEnabled(boolean enabled) {
         prefs().edit().putBoolean("mayo_local_premium", enabled).apply();
     }
+
+    // --- Menu item visibility: generic per-key toggle, default shown. Keys
+    // the user can't turn off (e.g. Mute/Search/Leave) never check this -
+    // they're just always added, same as before this feature existed. -----
+
+    public static final String MENU_HOME_GHOST_MODE = "home_ghost_mode";
+    public static final String MENU_HOME_NEW_GROUP = "home_new_group";
+    public static final String MENU_HOME_SCHEDULED = "home_scheduled";
+
+    public static final String MENU_CHAT_ADMIN_RESTRICT = "chat_admin_restrict";
+    public static final String MENU_CHAT_ADMIN_BOOST = "chat_admin_boost";
+    public static final String MENU_CHAT_ADMIN_GO_TO_TOP = "chat_admin_go_to_top";
+    public static final String MENU_CHAT_ADMIN_RECENT_ACTIONS = "chat_admin_recent_actions";
+    public static final String MENU_CHAT_ADMIN_MEMBERS = "chat_admin_members";
+    public static final String MENU_CHAT_ADMIN_INVITE_LINKS = "chat_admin_invite_links";
+
+    public static final String MENU_CHAT_USER_GO_TO_TOP = "chat_user_go_to_top";
+    public static final String MENU_CHAT_USER_REPORT = "chat_user_report";
+
+    public static final String MENU_MSG_ADMIN_REPLY = "msg_admin_reply";
+    public static final String MENU_MSG_ADMIN_COPY_LINK = "msg_admin_copy_link";
+    public static final String MENU_MSG_ADMIN_SHOW_OWNER = "msg_admin_show_owner";
+    public static final String MENU_MSG_ADMIN_SAVE_MUSIC = "msg_admin_save_music";
+    public static final String MENU_MSG_ADMIN_EDIT = "msg_admin_edit";
+
+    public static final String MENU_MSG_USER_REPLY = "msg_user_reply";
+    public static final String MENU_MSG_USER_COPY_LINK = "msg_user_copy_link";
+    public static final String MENU_MSG_USER_SHOW_OWNER = "msg_user_show_owner";
+    public static final String MENU_MSG_USER_SAVE_MUSIC = "msg_user_save_music";
+    public static final String MENU_MSG_USER_EDIT = "msg_user_edit";
+
+    public static boolean isMenuItemVisible(String key) {
+        return prefs().getBoolean("mayo_menu_" + key, true);
+    }
+
+    public static void setMenuItemVisible(String key, boolean visible) {
+        prefs().edit().putBoolean("mayo_menu_" + key, visible).apply();
+    }
 }

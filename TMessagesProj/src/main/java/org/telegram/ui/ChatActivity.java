@@ -1706,6 +1706,9 @@ public class ChatActivity extends BaseFragment implements
     private final static int chat_menu_topic_create = 73;
     private final static int go_to_top = 75;
     private final static int restrict = 76;
+    private final static int mayo_recent_actions = 77;
+    private final static int mayo_members = 78;
+    private final static int mayo_invite_links = 79;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3918,6 +3921,25 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (id == report) {
                     ReportBottomSheet.openChat(ChatActivity.this);
+                } else if (id == mayo_recent_actions) {
+                    if (currentChat != null) {
+                        presentFragment(new ChannelAdminLogActivity(currentChat));
+                    }
+                } else if (id == mayo_members) {
+                    if (currentChat != null) {
+                        Bundle args = new Bundle();
+                        args.putLong("chat_id", currentChat.id);
+                        args.putInt("type", ChatUsersActivity.TYPE_USERS);
+                        ChatUsersActivity fragment = new ChatUsersActivity(args);
+                        fragment.setInfo(chatInfo);
+                        presentFragment(fragment);
+                    }
+                } else if (id == mayo_invite_links) {
+                    if (currentChat != null && chatInfo != null) {
+                        ManageLinksActivity fragment = new ManageLinksActivity(currentChat.id, 0, 0);
+                        fragment.setInfo(chatInfo, chatInfo.exported_invite);
+                        presentFragment(fragment);
+                    }
                 } else if (id == star) {
                     for (int a = 0; a < 2; a++) {
                         for (int b = 0; b < selectedMessagesCanStarIds[a].size(); b++) {
@@ -4463,13 +4485,26 @@ public class ChatActivity extends BaseFragment implements
             if (searchItem != null) {
                 headerItem.lazilyAddSubItem(search, R.drawable.msg_search, LocaleController.getString(R.string.Search));
             }
-            if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
+            if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))
+                    && org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_BOOST)) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, dp(24), dp(24));
                 headerItem.lazilyAddSubItem(boost_group, drawable, LocaleController.getString(ChatObject.isChannelAndNotMegaGroup(currentChat) ? R.string.BoostingBoostChannelMenu : R.string.BoostingBoostGroupMenu));
             }
+            if (ChatObject.hasAdminRights(currentChat)) {
+                if (org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_RECENT_ACTIONS)) {
+                    headerItem.lazilyAddSubItem(mayo_recent_actions, R.drawable.msg_log, LocaleController.getString(R.string.EventLog));
+                }
+                if (org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_MEMBERS)) {
+                    headerItem.lazilyAddSubItem(mayo_members, R.drawable.msg_groups, LocaleController.getString(R.string.ChannelMembers));
+                }
+                if (org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_INVITE_LINKS)) {
+                    headerItem.lazilyAddSubItem(mayo_invite_links, R.drawable.msg_link2, LocaleController.getString(R.string.InviteLinks));
+                }
+            }
             translateItem = headerItem.lazilyAddSubItem(translate, R.drawable.msg_translate, LocaleController.getString(R.string.TranslateMessage));
             updateTranslateItemVisibility();
-            if (currentChat != null && !currentChat.creator && !ChatObject.hasAdminRights(currentChat)) {
+            if (currentChat != null && !currentChat.creator && !ChatObject.hasAdminRights(currentChat)
+                    && org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_CHAT_USER_REPORT)) {
                 headerItem.lazilyAddSubItem(report, R.drawable.msg_report, LocaleController.getString(R.string.ReportChat));
             }
             if (currentUser != null && currentUser.id != UserObject.VERIFY && currentUser.id != UserObject.REPLY_BOT) {
@@ -4491,7 +4526,8 @@ public class ChatActivity extends BaseFragment implements
                 clearHistoryItem = headerItem.lazilyAddSubItem(clear_history, R.drawable.msg_clear,
                     LocaleController.getString(UserObject.isBotForum(currentUser) ? R.string.ClearAllHistory : R.string.ClearHistory));
             }
-            if (ChatObject.isChannel(currentChat)) {
+            if (ChatObject.isChannel(currentChat) && org.telegram.messenger.MayogramCustomization.isMenuItemVisible(
+                    ChatObject.hasAdminRights(currentChat) ? org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_GO_TO_TOP : org.telegram.messenger.MayogramCustomization.MENU_CHAT_USER_GO_TO_TOP)) {
                 headerItem.lazilyAddSubItem(go_to_top, R.drawable.msg_go_up,
                         LocaleController.getString(R.string.GoToTopMenuItem));
             }
@@ -16881,6 +16917,7 @@ public class ChatActivity extends BaseFragment implements
         boolean isRestricted = currentChat != null && currentChat.noforwards;
         restrictItem.setText(LocaleController.getString(R.string.Restricted) + " · " +
                 LocaleController.getString(isRestricted ? R.string.RestrictedOn : R.string.RestrictedOff));
+        restrictItem.setVisibility(org.telegram.messenger.MayogramCustomization.isMenuItemVisible(org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_RESTRICT) ? View.VISIBLE : View.GONE);
     }
 
     private void toggleMute(boolean instant) {
@@ -46724,6 +46761,42 @@ public class ChatActivity extends BaseFragment implements
             items.add(getString(R.string.WelcomeMessageRevert));
             options.add(OPTION_WELCOME_REVERT);
             icons.add(R.drawable.outline_revert_24);
+        }
+
+        applyMayogramMessageMenuVisibility(icons, items, options);
+    }
+
+    // Mayogram: a single filtering pass over the already-built menu, applied after
+    // every message-type branch above instead of gating each individual
+    // items.add()/options.add() call - those are scattered across many
+    // message-type branches above (text/photo/video/music/poll/etc.) and some
+    // options (like OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC) are reused for more than
+    // one label, so filtering by the final (option, label) pair here is far
+    // less risky than touching each call site.
+    private void applyMayogramMessageMenuVisibility(ArrayList<Integer> icons, ArrayList<CharSequence> items, ArrayList<Integer> options) {
+        boolean isAdmin = currentChat != null && ChatObject.hasAdminRights(currentChat);
+        CharSequence saveToMusicLabel = LocaleController.getString(R.string.SaveToMusic);
+        for (int a = options.size() - 1; a >= 0; a--) {
+            int option = options.get(a);
+            String key;
+            if (option == OPTION_REPLY) {
+                key = isAdmin ? org.telegram.messenger.MayogramCustomization.MENU_MSG_ADMIN_REPLY : org.telegram.messenger.MayogramCustomization.MENU_MSG_USER_REPLY;
+            } else if (option == OPTION_COPY_LINK) {
+                key = isAdmin ? org.telegram.messenger.MayogramCustomization.MENU_MSG_ADMIN_COPY_LINK : org.telegram.messenger.MayogramCustomization.MENU_MSG_USER_COPY_LINK;
+            } else if (option == OPTION_MAYO_MESSAGE_OWNER) {
+                key = isAdmin ? org.telegram.messenger.MayogramCustomization.MENU_MSG_ADMIN_SHOW_OWNER : org.telegram.messenger.MayogramCustomization.MENU_MSG_USER_SHOW_OWNER;
+            } else if (option == OPTION_EDIT) {
+                key = isAdmin ? org.telegram.messenger.MayogramCustomization.MENU_MSG_ADMIN_EDIT : org.telegram.messenger.MayogramCustomization.MENU_MSG_USER_EDIT;
+            } else if (option == OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC && a < items.size() && TextUtils.equals(items.get(a), saveToMusicLabel)) {
+                key = isAdmin ? org.telegram.messenger.MayogramCustomization.MENU_MSG_ADMIN_SAVE_MUSIC : org.telegram.messenger.MayogramCustomization.MENU_MSG_USER_SAVE_MUSIC;
+            } else {
+                key = null;
+            }
+            if (key != null && !org.telegram.messenger.MayogramCustomization.isMenuItemVisible(key)) {
+                options.remove(a);
+                if (a < items.size()) items.remove(a);
+                if (a < icons.size()) icons.remove(a);
+            }
         }
     }
 
