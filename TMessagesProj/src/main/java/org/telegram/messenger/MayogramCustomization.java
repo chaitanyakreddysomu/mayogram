@@ -73,4 +73,25 @@ public class MayogramCustomization {
     public static void setTitleMode(int mode) {
         prefs().edit().putInt("mayo_title_mode", mode).apply();
     }
+
+    // --- General: message time format --------------------------------------
+
+    public static boolean isTimeWithSecondsEnabled() {
+        return prefs().getBoolean("mayo_time_with_seconds", false);
+    }
+
+    public static void setTimeWithSecondsEnabled(boolean enabled) {
+        prefs().edit().putBoolean("mayo_time_with_seconds", enabled).apply();
+    }
+
+    // --- Local Premium: device-only cosmetic toggle, never touches the real
+    // account's premium status or anything sent to the server --------------
+
+    public static boolean isLocalPremiumEnabled() {
+        return prefs().getBoolean("mayo_local_premium", false);
+    }
+
+    public static void setLocalPremiumEnabled(boolean enabled) {
+        prefs().edit().putBoolean("mayo_local_premium", enabled).apply();
+    }
 }

@@ -1,16 +1,19 @@
 /*
  * Mayogram: simple "About" screen opened from the Settings row of the same
- * name - app icon + "Mayogram vX.X.X" at the top, then a Links section with
- * a row that opens the official @mayogram channel.
+ * name - circular app icon + "MayoGram X.X.X" at the top, then Categories
+ * (General / Appearance / Local Premium) and a Links section with a row
+ * that opens the official @mayogram channel.
  */
 
 package org.telegram.ui;
 
 import android.content.Context;
 import android.content.pm.PackageInfo;
+import android.graphics.Outline;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -19,7 +22,6 @@ import android.widget.TextView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
-import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
@@ -32,13 +34,10 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 public class MayogramInfoActivity extends UniversalFragment {
 
-    private static final int BUTTON_CHANNEL = 1;
-    private static final int BUTTON_SUPPORT = 2;
-
-    private static final String SUPPORT_URL = "https://buymeatea.in/mayogram";
-
-    public int channelRow;
-    public int supportRow;
+    private static final int BUTTON_GENERAL = 1;
+    private static final int BUTTON_APPEARANCE = 2;
+    private static final int BUTTON_LOCAL_PREMIUM = 3;
+    private static final int BUTTON_CHANNEL = 4;
 
     @Override
     protected CharSequence getTitle() {
@@ -47,17 +46,17 @@ public class MayogramInfoActivity extends UniversalFragment {
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        channelRow = -1;
-        supportRow = -1;
-
         items.add(UItem.asCustom(createHeaderView(getContext())));
         items.add(UItem.asShadow(null));
 
+        items.add(UItem.asHeader("CATEGORIES"));
+        items.add(UItem.asButton(BUTTON_GENERAL, R.drawable.msg_settings, "General"));
+        items.add(UItem.asButton(BUTTON_APPEARANCE, R.drawable.msg_palette, "Appearance"));
+        items.add(UItem.asButton(BUTTON_LOCAL_PREMIUM, R.drawable.msg_premium_badge, "Local Premium"));
+        items.add(UItem.asShadow(null));
+
         items.add(UItem.asHeader("LINKS"));
-        channelRow = items.size();
         items.add(UItem.asButton(BUTTON_CHANNEL, R.drawable.msg2_discussion, "Channel", "@mayogram"));
-        supportRow = items.size();
-        items.add(UItem.asButton(BUTTON_SUPPORT, R.drawable.media_like, "Support Us ❤️", SUPPORT_URL));
         items.add(UItem.asShadow(null));
     }
 
@@ -73,10 +72,17 @@ public class MayogramInfoActivity extends UniversalFragment {
             iconView.setImageDrawable(context.getResources().getDrawable(R.mipmap.icon_mayo_foreground).mutate());
         } catch (Exception ignore) {
         }
+        iconView.setClipToOutline(true);
+        iconView.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setOval(0, 0, view.getWidth(), view.getHeight());
+            }
+        });
         layout.addView(iconView, LayoutHelper.createLinear(100, 100, Gravity.CENTER_HORIZONTAL));
 
         TextView nameView = new TextView(context);
-        nameView.setText("Mayogram v" + getAppVersionName());
+        nameView.setText("MayoGram " + getAppVersionName());
         nameView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         nameView.setTypeface(AndroidUtilities.bold());
         nameView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
@@ -101,10 +107,14 @@ public class MayogramInfoActivity extends UniversalFragment {
 
     @Override
     protected void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == BUTTON_CHANNEL) {
+        if (item.id == BUTTON_GENERAL) {
+            presentFragment(new MayogramGeneralActivity());
+        } else if (item.id == BUTTON_APPEARANCE) {
+            presentFragment(new MayogramCustomizeActivity());
+        } else if (item.id == BUTTON_LOCAL_PREMIUM) {
+            presentFragment(new MayogramLocalPremiumActivity());
+        } else if (item.id == BUTTON_CHANNEL) {
             getMessagesController().openByUserName("mayogram", this, 1);
-        } else if (item.id == BUTTON_SUPPORT) {
-            Browser.openUrl(getContext(), SUPPORT_URL);
         }
     }
 

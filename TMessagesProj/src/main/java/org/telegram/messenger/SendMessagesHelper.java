@@ -1805,6 +1805,21 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     private int forwardJobMessageId;
     private int forwardJobSeq;
 
+    // Mayogram: lets the UI show "X of Y forwarded" progress while the restricted-chat
+    // cache re-upload path works through its queue one message at a time.
+    public interface ForwardProgressListener {
+        void onForwardProgress(int done, int total);
+    }
+    private ForwardProgressListener forwardProgressListener;
+    private int forwardProgressTotal;
+    private int forwardProgressDone;
+
+    public void setForwardProgressListener(ForwardProgressListener listener, int total) {
+        forwardProgressListener = listener;
+        forwardProgressTotal = total;
+        forwardProgressDone = 0;
+    }
+
     private void enqueueForwardJob(Runnable job) {
         forwardJobs.add(job);
         if (!forwardJobRunning) {
@@ -1845,6 +1860,15 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         forwardJobAsyncPending = false;
         forwardJobMessageId = 0;
         forwardJobSeq++;
+        if (forwardProgressListener != null) {
+            ForwardProgressListener listener = forwardProgressListener;
+            int done = ++forwardProgressDone;
+            int total = forwardProgressTotal;
+            if (done >= total) {
+                forwardProgressListener = null;
+            }
+            listener.onForwardProgress(done, total);
+        }
         AndroidUtilities.runOnUIThread(this::runNextForwardJob);
     }
 

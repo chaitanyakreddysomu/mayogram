@@ -53,7 +53,7 @@ public class MayogramCustomizeActivity extends UniversalFragment {
 
     @Override
     protected CharSequence getTitle() {
-        return "Customise";
+        return "Appearance";
     }
 
     @Override

@@ -34830,6 +34830,16 @@ public class ChatActivity extends BaseFragment implements
 
                 messagePreviewParams = null;
                 hideFieldPanel(false);
+                // Mayogram: a restricted source forwards one message at a time (cache re-upload),
+                // so show a live "X of Y forwarded" bulletin instead of the normal instant one.
+                // Unrestricted sources still forward all at once like stock Telegram - no bar needed.
+                final boolean restrictedForward = isPeerNoForwards() && dids.size() == 1;
+                if (restrictedForward) {
+                    final long progressDid = dids.get(0).dialogId;
+                    getSendMessagesHelper().setForwardProgressListener((done, total) -> AndroidUtilities.runOnUIThread(() -> {
+                        BulletinFactory.of(ChatActivity.this).createSimpleBulletin(R.raw.forward, LocaleController.formatString("FwdMessagesProgress", R.string.FwdMessagesProgress, done, total)).show();
+                    }), fmessages.size());
+                }
                 for (int a = 0; a < dids.size(); a++) {
                     final long did = dids.get(a).dialogId;
                     final Long price = prices == null ? (Long) 0L : prices.get(did);
@@ -34845,7 +34855,7 @@ public class ChatActivity extends BaseFragment implements
                 }
                 fragment.finishFragment();
                 createUndoView();
-                if (undoView != null) {
+                if (undoView != null && !restrictedForward) {
                     if (dids.size() == 1) {
                         if (!BulletinFactory.of(ChatActivity.this).showForwardedBulletinWithTag(dids.get(0).dialogId, fmessages.size())) {
                             undoView.showWithAction(dids.get(0).dialogId, UndoView.ACTION_FWD_MESSAGES, fmessages.size());

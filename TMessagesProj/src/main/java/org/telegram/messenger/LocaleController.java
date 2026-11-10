@@ -112,6 +112,11 @@ public class LocaleController {
         return formatterDayWithSeconds;
     }
 
+    /** Mayogram: Settings -> Mayogram -> General -> "Format time with seconds". */
+    public FastDateFormat getFormatterDayOrSeconds() {
+        return MayogramCustomization.isTimeWithSecondsEnabled() ? getFormatterDayWithSeconds() : getFormatterDay();
+    }
+
     private volatile FastDateFormat formatterConstDay;
     public FastDateFormat getFormatterConstDay() {
         if (formatterConstDay == null) {
