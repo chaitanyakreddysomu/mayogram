@@ -8,6 +8,7 @@ package org.telegram.ui;
 import android.view.View;
 
 import org.telegram.messenger.MayogramCustomization;
+import org.telegram.messenger.MayogramExportController;
 import org.telegram.messenger.MayogramFollowersController;
 import org.telegram.messenger.R;
 import org.telegram.ui.Components.BulletinFactory;
@@ -21,6 +22,7 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
 
     private static final int BUTTON_VIEW_LIST = 1;
     private static final int BUTTON_RESCAN = 2;
+    private static final int BUTTON_EXPORT = 3;
 
     /** A scan older than this is treated as stale and auto-refreshed on open. */
     private static final long STALE_AFTER_MS = 24 * 60 * 60 * 1000L;
@@ -28,6 +30,7 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     private int progressDone;
     private int progressTotal;
     private int progressUnique;
+    private boolean exporting;
 
     @Override
     protected CharSequence getTitle() {
@@ -79,7 +82,8 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
 
             items.add(UItem.asButton(BUTTON_VIEW_LIST, "View All Followers"));
             items.add(UItem.asButton(BUTTON_RESCAN, "Rescan"));
-            items.add(UItem.asShadow(null));
+            items.add(UItem.asButton(BUTTON_EXPORT, exporting ? "Exporting..." : "Export as CSV"));
+            items.add(UItem.asShadow("Exports telegram_userid, username, first_name, last_name, phone_number as a CSV you can open in Excel or share. Phone numbers will be blank for almost everyone - Telegram only shares a phone number with accounts that already have that person as a contact."));
         } else {
             items.add(UItem.asHeader("UNIQUE FOLLOWERS"));
             items.add(UItem.asShadow("Starting scan..."));
@@ -92,6 +96,63 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
             presentFragment(new MayogramFollowersListActivity());
         } else if (item.id == BUTTON_RESCAN) {
             startScanWithNotice();
+        } else if (item.id == BUTTON_EXPORT) {
+            startExport();
+        }
+    }
+
+    private void startExport() {
+        if (exporting) {
+            return;
+        }
+        exporting = true;
+        if (listView != null) {
+            listView.adapter.update(true);
+        }
+        int account = getCurrentAccount();
+        MayogramExportController.exportFollowersToCsv(account, MayogramCustomization.getFollowersIds(account), new MayogramExportController.ExportCallback() {
+            @Override
+            public void onDone(java.io.File csvFile) {
+                exporting = false;
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+                shareCsv(csvFile);
+            }
+
+            @Override
+            public void onError() {
+                exporting = false;
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+                if (getParentActivity() != null) {
+                    BulletinFactory.of(MayogramUniqueFollowersActivity.this).createSimpleBulletin(R.drawable.msg_retry, "Export failed.").show();
+                }
+            }
+        });
+    }
+
+    private void shareCsv(java.io.File file) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        try {
+            android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            intent.setType("text/csv");
+            if (android.os.Build.VERSION.SDK_INT >= 24) {
+                try {
+                    intent.putExtra(android.content.Intent.EXTRA_STREAM, androidx.core.content.FileProvider.getUriForFile(getParentActivity(), org.telegram.messenger.ApplicationLoader.getApplicationId() + ".provider", file));
+                    intent.setFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (Exception ignore) {
+                    intent.putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.fromFile(file));
+                }
+            } else {
+                intent.putExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri.fromFile(file));
+            }
+            getParentActivity().startActivity(android.content.Intent.createChooser(intent, "Share CSV"));
+        } catch (Exception e) {
+            org.telegram.messenger.FileLog.e(e);
         }
     }
 
