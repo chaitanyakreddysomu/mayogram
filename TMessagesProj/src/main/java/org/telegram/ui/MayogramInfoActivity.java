@@ -38,6 +38,7 @@ public class MayogramInfoActivity extends UniversalFragment {
     private static final int BUTTON_APPEARANCE = 2;
     private static final int BUTTON_LOCAL_PREMIUM = 3;
     private static final int BUTTON_MENUS = 5;
+    private static final int BUTTON_FOLLOWERS = 6;
     private static final int BUTTON_CHANNEL = 4;
 
     @Override
@@ -55,6 +56,7 @@ public class MayogramInfoActivity extends UniversalFragment {
         items.add(UItem.asButton(BUTTON_APPEARANCE, R.drawable.msg_palette, "Appearance"));
         items.add(UItem.asButton(BUTTON_LOCAL_PREMIUM, R.drawable.msg_premium_badge, "Local Premium"));
         items.add(UItem.asButton(BUTTON_MENUS, R.drawable.msg_permissions, "Menus"));
+        items.add(UItem.asButton(BUTTON_FOLLOWERS, R.drawable.msg_stats, "Followers"));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader("LINKS"));
@@ -117,6 +119,8 @@ public class MayogramInfoActivity extends UniversalFragment {
             presentFragment(new MayogramLocalPremiumActivity());
         } else if (item.id == BUTTON_MENUS) {
             presentFragment(new MayogramMenusActivity());
+        } else if (item.id == BUTTON_FOLLOWERS) {
+            presentFragment(new MayogramUniqueFollowersActivity());
         } else if (item.id == BUTTON_CHANNEL) {
             getMessagesController().openByUserName("mayogram", this, 1);
         }

@@ -57,6 +57,31 @@ public class MayogramFollowersController {
         }
         scanningByAccount.put(account, true);
 
+        // The local dialog list is paginated in from the server and may not be
+        // fully synced yet (especially the archive folder, which most users
+        // never scroll into) - an owned channel missing from it would silently
+        // undercount. Make sure both the main and archive folders are fully
+        // loaded before reading from them.
+        ensureDialogsLoaded(account, 0, 0, () ->
+            ensureDialogsLoaded(account, 1, 0, () ->
+                beginScan(account)));
+    }
+
+    private static final int MAX_LOAD_DIALOGS_ATTEMPTS = 100;
+
+    private static void ensureDialogsLoaded(int account, int folderId, int attempt, Runnable onDone) {
+        MessagesController controller = MessagesController.getInstance(account);
+        if (controller.isDialogsEndReached(folderId) || attempt >= MAX_LOAD_DIALOGS_ATTEMPTS) {
+            onDone.run();
+            return;
+        }
+        if (!controller.isLoadingDialogs(folderId)) {
+            controller.loadDialogs(folderId, 0, 100, false);
+        }
+        AndroidUtilities.runOnUIThread(() -> ensureDialogsLoaded(account, folderId, attempt + 1, onDone), 300);
+    }
+
+    private static void beginScan(int account) {
         ArrayList<TLRPC.Chat> ownedChannels = new ArrayList<>();
         ArrayList<TLRPC.Dialog> dialogs = MessagesController.getInstance(account).getAllDialogs();
         for (int i = 0; i < dialogs.size(); i++) {
