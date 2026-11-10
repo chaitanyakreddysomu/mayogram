@@ -9,6 +9,7 @@ import android.view.View;
 
 import org.telegram.messenger.MayogramCustomization;
 import org.telegram.messenger.MayogramFollowersController;
+import org.telegram.messenger.R;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
@@ -31,12 +32,13 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     }
 
     @Override
-    public void onFragmentCreate() {
-        super.onFragmentCreate();
+    public boolean onFragmentCreate() {
+        boolean result = super.onFragmentCreate();
         MayogramFollowersController.setListener(getCurrentAccount(), this);
         if (!MayogramFollowersController.isScanning(getCurrentAccount()) && MayogramCustomization.getFollowersLastScan(getCurrentAccount()) == 0) {
             startScanWithNotice();
         }
+        return result;
     }
 
     @Override
