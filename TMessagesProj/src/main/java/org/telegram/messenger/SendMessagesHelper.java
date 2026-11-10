@@ -8330,6 +8330,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                             TLRPC.Message message = newMessages.get(id);
                             if (message != null) {
                                 MessageObject.getDialogId(message);
+                                MayogramCustomization.restoreLocalPremiumEmojiEntities(newMsgObj, message);
                                 sentMessages.add(message);
                                 if ((message.flags & 33554432) != 0) {
                                     msgObj.messageOwner.ttl_period = message.ttl_period;
@@ -8871,6 +8872,7 @@ private boolean isChannelUnrestricted(MessageObject messageObject) {
                                     msgObj.messageOwner.ttl_period = message.ttl_period;
                                     msgObj.messageOwner.flags |= 33554432;
                                 }
+                                MayogramCustomization.restoreLocalPremiumEmojiEntities(msgObj.messageOwner, message);
                                 msgObj.messageOwner.entities = message.entities;
                                 msgObj.messageOwner.quick_reply_shortcut_id = message.quick_reply_shortcut_id;
                                 if (msgObj.messageOwner.quick_reply_shortcut_id != 0) {

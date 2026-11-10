@@ -51,6 +51,44 @@ public class MayogramFollowersController {
         }
     }
 
+    /**
+     * The in-memory user cache (MessagesController.getUser) is wiped on every
+     * app restart, but these follower ids are rarely touched by any other
+     * normal app activity, so after a restart they'd otherwise show as blank
+     * "User 12345" placeholders until the next full rescan. This reloads just
+     * the missing ones from local storage (already durable there since the
+     * last scan) and calls onDone on the UI thread once they're ready to
+     * display - no network request, no full rescan needed.
+     */
+    public static void ensureUsersCached(int account, List<Long> ids, Runnable onDone) {
+        ArrayList<Long> missing = new ArrayList<>();
+        MessagesController controller = MessagesController.getInstance(account);
+        for (int i = 0; i < ids.size(); i++) {
+            long id = ids.get(i);
+            if (controller.getUser(id) == null) {
+                missing.add(id);
+            }
+        }
+        if (missing.isEmpty()) {
+            onDone.run();
+            return;
+        }
+        MessagesStorage.getInstance(account).getStorageQueue().postRunnable(() -> {
+            ArrayList<TLRPC.User> loaded = new ArrayList<>();
+            try {
+                MessagesStorage.getInstance(account).getUsersInternal(missing, loaded);
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+            AndroidUtilities.runOnUIThread(() -> {
+                if (!loaded.isEmpty()) {
+                    controller.putUsers(loaded, true);
+                }
+                onDone.run();
+            });
+        });
+    }
+
     public static void startScan(int account) {
         if (isScanning(account)) {
             return;
@@ -133,7 +171,11 @@ public class MayogramFollowersController {
                 }
                 // Cache the real user objects (name, avatar) the server already sent
                 // us here, so the followers list can show them - no extra lookups.
+                // Also persisted to local storage (not just the in-memory cache),
+                // since the in-memory cache is wiped on every app restart but these
+                // users are rarely touched by any other normal app activity.
                 MessagesController.getInstance(state.account).putUsers(res.users, false);
+                MessagesStorage.getInstance(state.account).putUsersAndChats(res.users, null, false, true);
                 for (int i = 0; i < res.users.size(); i++) {
                     state.uniqueFollowers.add(res.users.get(i).id);
                 }

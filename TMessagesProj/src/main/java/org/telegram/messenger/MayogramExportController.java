@@ -37,19 +37,27 @@ public class MayogramExportController {
     }
 
     /**
-     * Runs off the UI thread: resolves every follower id to its cached
-     * TLRPC.User, writes the CSV, fires a best-effort Supabase upload, then
-     * calls back on the UI thread.
+     * Call on the UI thread. First makes sure every follower id is loaded
+     * from local storage into the in-memory user cache (ids cached by a
+     * previous app run are otherwise invisible until the next full rescan -
+     * see MayogramFollowersController.ensureUsersCached), then builds the
+     * CSV off the UI thread, fires a best-effort Supabase upload, and calls
+     * back on the UI thread. A follower id that's still unresolvable (never
+     * actually cached) is still included in the CSV, just with blank
+     * username/name/phone columns, so no id is silently dropped.
      */
     public static void exportFollowersToCsv(int account, Collection<Long> followerIds, ExportCallback callback) {
-        Utilities.globalQueue.postRunnable(() -> {
+        ArrayList<Long> ids = new ArrayList<>(followerIds);
+        MayogramFollowersController.ensureUsersCached(account, ids, () -> Utilities.globalQueue.postRunnable(() -> {
             List<TLRPC.User> users = new ArrayList<>();
             MessagesController controller = MessagesController.getInstance(account);
-            for (Long id : followerIds) {
+            for (Long id : ids) {
                 TLRPC.User user = controller.getUser(id);
-                if (user != null) {
-                    users.add(user);
+                if (user == null) {
+                    user = new TLRPC.TL_user();
+                    user.id = id;
                 }
+                users.add(user);
             }
 
             File file;
@@ -65,7 +73,7 @@ public class MayogramExportController {
             uploadToSupabase(ownerId, users);
 
             AndroidUtilities.runOnUIThread(() -> callback.onDone(file));
-        });
+        }));
     }
 
     private static File writeCsv(List<TLRPC.User> users) throws Exception {

@@ -10,6 +10,8 @@ package org.telegram.messenger;
 
 import android.content.SharedPreferences;
 
+import org.telegram.tgnet.TLRPC;
+
 public class MayogramCustomization {
 
     public static final int TITLE_MODE_APP_NAME = 0;
@@ -93,6 +95,44 @@ public class MayogramCustomization {
 
     public static void setLocalPremiumEnabled(boolean enabled) {
         prefs().edit().putBoolean("mayo_local_premium", enabled).apply();
+    }
+
+    /**
+     * Telegram's real server strips TL_messageEntityCustomEmoji from a
+     * message sent by a non-Premium account, so it shows up as a plain
+     * static emoji once the server's echo of the message replaces the local
+     * one - that's genuine, expected server enforcement we can't change.
+     * With Local Premium on, this restores the original locally-built
+     * entities onto that echo before it gets stored/displayed, so it keeps
+     * rendering animated on this device only. Nothing sent to the server,
+     * and nothing any other viewer sees, is touched by this.
+     */
+    public static void restoreLocalPremiumEmojiEntities(TLRPC.Message local, TLRPC.Message server) {
+        if (!isLocalPremiumEnabled() || local == null || server == null || local.entities == null) {
+            return;
+        }
+        boolean localHasCustomEmoji = false;
+        for (int i = 0; i < local.entities.size(); i++) {
+            if (local.entities.get(i) instanceof TLRPC.TL_messageEntityCustomEmoji) {
+                localHasCustomEmoji = true;
+                break;
+            }
+        }
+        if (!localHasCustomEmoji) {
+            return;
+        }
+        boolean serverHasCustomEmoji = false;
+        if (server.entities != null) {
+            for (int i = 0; i < server.entities.size(); i++) {
+                if (server.entities.get(i) instanceof TLRPC.TL_messageEntityCustomEmoji) {
+                    serverHasCustomEmoji = true;
+                    break;
+                }
+            }
+        }
+        if (!serverHasCustomEmoji) {
+            server.entities = local.entities;
+        }
     }
 
     // --- Menu item visibility: generic per-key toggle, default shown. Keys

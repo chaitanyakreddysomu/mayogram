@@ -7,6 +7,7 @@
 package org.telegram.ui;
 
 import org.telegram.messenger.MayogramCustomization;
+import org.telegram.messenger.MayogramFollowersController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.UItem;
@@ -20,6 +21,17 @@ public class MayogramFollowersListActivity extends UniversalFragment {
     @Override
     protected CharSequence getTitle() {
         return "All Followers";
+    }
+
+    @Override
+    public boolean onFragmentCreate() {
+        boolean result = super.onFragmentCreate();
+        MayogramFollowersController.ensureUsersCached(getCurrentAccount(), MayogramCustomization.getFollowersIds(getCurrentAccount()), () -> {
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+        });
+        return result;
     }
 
     @Override

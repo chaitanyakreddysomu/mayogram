@@ -4450,6 +4450,18 @@ public class LocaleController {
         final Context context = ApplicationLoader.applicationContext;
         String value;
 
+        // Mayogram: "AppName" must always be this fork's name, never
+        // Telegram's own cloud-pushed/bundled translation of it - every
+        // other lookup below (cloud strings, internal asset translations)
+        // would otherwise keep overriding our local resource value with
+        // "Telegram" on every locale, no matter what strings.xml says.
+        if (stringRes == R.string.AppName && context != null) {
+            try {
+                return context.getString(R.string.AppName);
+            } catch (Exception ignore) {
+            }
+        }
+
         if (BuildVars.USE_CLOUD_STRINGS) {
             value = localizationExternal.getByResNameOrResId(context, key, stringRes);
             if (value != null) {
