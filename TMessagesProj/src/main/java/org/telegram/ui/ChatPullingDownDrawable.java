@@ -416,7 +416,7 @@ public class ChatPullingDownDrawable implements NotificationCenter.NotificationC
                 finalImageReceiver = imageReceiver;
             }
             finalImageReceiver.setAlpha(alpha);
-            finalImageReceiver.setRoundRadius((int) (size / 2f));
+            finalImageReceiver.setRoundRadius(org.telegram.messenger.MayogramCustomization.avatarRadius((int) (size / 2f)));
             finalImageReceiver.setImageCoords(cx - size / 2f, top, size, size);
             if (isTopic && finalImageReceiver.getDrawable() != null && finalImageReceiver.getDrawable() instanceof CombinedDrawable && ((CombinedDrawable) finalImageReceiver.getDrawable()).getIcon() instanceof LetterDrawable) {
                 ((LetterDrawable) ((CombinedDrawable) finalImageReceiver.getDrawable()).getIcon()).scale = progress;
