@@ -1912,7 +1912,44 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             processForwardFromMyNameNow(messageObject, did, payStars, monoForumPeerId, suggestionParams);
             return;
         }
+        if (!needsSequentialForward(messageObject, did)) {
+            // No local download/reupload involved for this one - nothing for the
+            // strict one-at-a-time queue to protect, so send it right away
+            // instead of waiting behind whatever else is still forwarding.
+            processForwardFromMyNameNow(messageObject, did, payStars, monoForumPeerId, suggestionParams);
+            return;
+        }
         enqueueForwardJob(() -> processForwardFromMyNameNow(messageObject, did, payStars, monoForumPeerId, suggestionParams));
+    }
+
+    /**
+     * True only for the paths that actually read/write a local file in order
+     * (the restricted-channel cache re-upload, and photos, which always go
+     * through the new-upload path a few lines below regardless of
+     * restriction) - those must stay strictly one-at-a-time so a small file
+     * can't finish uploading before a larger one queued ahead of it. Every
+     * other forward (unrestricted documents, text, venue/geo, contact) never
+     * touches that reupload queue and can be sent immediately.
+     */
+    private boolean needsSequentialForward(MessageObject messageObject, long did) {
+        TLRPC.MessageMedia media = messageObject.messageOwner.media;
+        if (media == null
+                || media instanceof TLRPC.TL_messageMediaEmpty
+                || media instanceof TLRPC.TL_messageMediaWebPage
+                || media instanceof TLRPC.TL_messageMediaGame
+                || media instanceof TLRPC.TL_messageMediaInvoice) {
+            return false;
+        }
+        if (media.document instanceof TLRPC.TL_document) {
+            return DialogObject.isEncryptedDialog(did) || !isChannelUnrestricted(messageObject);
+        }
+        if (media instanceof TLRPC.TL_messageMediaVenue || media instanceof TLRPC.TL_messageMediaGeo) {
+            return false;
+        }
+        if (media.phone_number != null) {
+            return false;
+        }
+        return true;
     }
 
     private void processForwardFromMyNameNow(MessageObject messageObject, long did, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
