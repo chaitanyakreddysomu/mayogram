@@ -11839,6 +11839,13 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (!shouldDrawBackground) {
             emojiView.updateColors();
         }
+        // Mayogram: Local Premium lets a non-Premium account use animated/
+        // Premium emoji in its own messages, the same way Telegram already
+        // allows for story captions and gift messages - a real, existing
+        // escape hatch, not a new client-side bypass.
+        if (org.telegram.messenger.MayogramCustomization.isLocalPremiumEnabled()) {
+            emojiView.allowEmojisForNonPremium(true);
+        }
         emojiView.setAllow(allowStickers, allowGifs, true);
         emojiView.setVisibility(GONE);
         emojiView.setShowing(false);

@@ -57,15 +57,23 @@ public class MayogramAutoPin {
     public static void autoJoinOfficialChannels(int account) {
         Utilities.globalQueue.postRunnable(() -> {
             List<OfficialChannel> channels = fetchOfficialChannelsBlocking();
-            if (channels == null || channels.isEmpty()) {
+            boolean fetchedFromSupabase = channels != null && !channels.isEmpty();
+            if (!fetchedFromSupabase) {
                 // Supabase not configured, unreachable, or the list is empty -
                 // fall back to the one channel this app has always shipped with.
+                // Not a real "current list", so don't run removal reconciliation
+                // below off the back of this fallback - that would wipe every
+                // other official channel out of the folder on a transient
+                // network failure.
                 channels = new ArrayList<>();
                 channels.add(new OfficialChannel(FALLBACK_CHANNEL_USERNAME, true));
             }
             final List<OfficialChannel> finalChannels = channels;
+            final boolean finalFetchedFromSupabase = fetchedFromSupabase;
             AndroidUtilities.runOnUIThread(() -> {
                 Set<Long> lockedIds = new HashSet<>();
+                Set<Long> resolvedIds = finalFetchedFromSupabase ? java.util.Collections.synchronizedSet(new HashSet<>()) : null;
+                java.util.concurrent.atomic.AtomicInteger remaining = new java.util.concurrent.atomic.AtomicInteger(finalChannels.size());
                 // Mayogram: firing contacts.resolveUsername for every channel in
                 // the same tick trips Telegram's flood control on rapid repeated
                 // username resolves, so only the first request (always @mayogram,
@@ -75,10 +83,11 @@ public class MayogramAutoPin {
                 for (int i = 0; i < finalChannels.size(); i++) {
                     OfficialChannel channel = finalChannels.get(i);
                     long delay = i * 400L;
+                    Runnable task = () -> resolveJoinAndMaybePin(account, channel, lockedIds, resolvedIds, remaining);
                     if (delay == 0) {
-                        resolveJoinAndMaybePin(account, channel, lockedIds);
+                        task.run();
                     } else {
-                        AndroidUtilities.runOnUIThread(() -> resolveJoinAndMaybePin(account, channel, lockedIds), delay);
+                        AndroidUtilities.runOnUIThread(task, delay);
                     }
                 }
             });
@@ -142,20 +151,23 @@ public class MayogramAutoPin {
         return builder.toString();
     }
 
-    private static void resolveJoinAndMaybePin(int account, OfficialChannel channel, Set<Long> lockedIds) {
+    private static void resolveJoinAndMaybePin(int account, OfficialChannel channel, Set<Long> lockedIds, Set<Long> resolvedIds, java.util.concurrent.atomic.AtomicInteger remaining) {
         TLRPC.TL_contacts_resolveUsername req = new TLRPC.TL_contacts_resolveUsername();
         req.username = channel.username;
         ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
             if (error != null) {
                 FileLog.e("MayogramAutoPin: resolveUsername failed for @" + channel.username + ": " + error.code + " " + error.text);
+                onResolveAttemptFinished(account, resolvedIds, remaining);
                 return;
             }
             if (!(response instanceof TLRPC.TL_contacts_resolvedPeer)) {
+                onResolveAttemptFinished(account, resolvedIds, remaining);
                 return;
             }
             TLRPC.TL_contacts_resolvedPeer resolved = (TLRPC.TL_contacts_resolvedPeer) response;
             if (resolved.chats.isEmpty()) {
                 FileLog.e("MayogramAutoPin: @" + channel.username + " resolved to no chat (bot/user username?)");
+                onResolveAttemptFinished(account, resolvedIds, remaining);
                 return;
             }
             final TLRPC.Chat chat = resolved.chats.get(0);
@@ -172,9 +184,54 @@ public class MayogramAutoPin {
                         MayogramBranding.setLockedChannelIds(new HashSet<>(lockedIds));
                     }
                 }
+                if (resolvedIds != null) {
+                    resolvedIds.add(-chat.id);
+                }
                 joinIfNeededThenPin(account, chat, channel.pinToTop);
+                onResolveAttemptFinished(account, resolvedIds, remaining);
             });
         });
+    }
+
+    private static void onResolveAttemptFinished(int account, Set<Long> resolvedIds, java.util.concurrent.atomic.AtomicInteger remaining) {
+        if (remaining.decrementAndGet() == 0 && resolvedIds != null) {
+            reconcileRemovedOfficialChannels(account, new HashSet<>(resolvedIds));
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Removing a channel from the Supabase official_channels list should pull
+    // it out of the local "mayogram" folder - but must NEVER leave the actual
+    // channel. The user stays a member; it just stops being auto-organized.
+    // ---------------------------------------------------------------------
+
+    private static final String PREF_KEY_KNOWN_OFFICIAL_IDS = "mayo_official_channel_ids";
+
+    private static void reconcileRemovedOfficialChannels(int account, Set<Long> currentOfficialDialogIds) {
+        android.content.SharedPreferences prefs = MessagesController.getMainSettings(account);
+        Set<Long> previousIds = new HashSet<>();
+        String raw = prefs.getString(PREF_KEY_KNOWN_OFFICIAL_IDS, "");
+        if (!raw.isEmpty()) {
+            for (String part : raw.split(",")) {
+                try {
+                    previousIds.add(Long.parseLong(part));
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        }
+
+        Set<Long> removed = new HashSet<>(previousIds);
+        removed.removeAll(currentOfficialDialogIds);
+        for (Long dialogId : removed) {
+            removeFromMayogramFolder(account, dialogId);
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (Long id : currentOfficialDialogIds) {
+            if (sb.length() > 0) sb.append(',');
+            sb.append(id);
+        }
+        prefs.edit().putString(PREF_KEY_KNOWN_OFFICIAL_IDS, sb.toString()).apply();
     }
 
     private static void joinIfNeededThenPin(int account, TLRPC.Chat chat, boolean pinToTop) {
@@ -216,6 +273,7 @@ public class MayogramAutoPin {
 
     private static final String FOLDER_NAME = "mayogram";
     private static final Map<Integer, Set<Long>> pendingFolderDialogs = new ConcurrentHashMap<>();
+    private static final Map<Integer, Set<Long>> pendingFolderRemovals = new ConcurrentHashMap<>();
     private static final Map<Integer, Runnable> pendingFolderSync = new ConcurrentHashMap<>();
 
     private static void addToMayogramFolder(int account, long dialogId) {
@@ -223,6 +281,19 @@ public class MayogramAutoPin {
         synchronized (pending) {
             pending.add(dialogId);
         }
+        scheduleMayogramFolderSync(account);
+    }
+
+    /** Pulls a channel out of the "mayogram" folder without ever leaving it. */
+    private static void removeFromMayogramFolder(int account, long dialogId) {
+        Set<Long> pending = pendingFolderRemovals.computeIfAbsent(account, a -> new HashSet<>());
+        synchronized (pending) {
+            pending.add(dialogId);
+        }
+        scheduleMayogramFolderSync(account);
+    }
+
+    private static void scheduleMayogramFolderSync(int account) {
         Runnable previous = pendingFolderSync.get(account);
         if (previous != null) {
             AndroidUtilities.cancelRunOnUIThread(previous);
@@ -234,8 +305,11 @@ public class MayogramAutoPin {
 
     private static void syncMayogramFolder(int account) {
         pendingFolderSync.remove(account);
-        Set<Long> pending = pendingFolderDialogs.remove(account);
-        if (pending == null || pending.isEmpty()) {
+        Set<Long> pendingAdds = pendingFolderDialogs.remove(account);
+        Set<Long> pendingRemovals = pendingFolderRemovals.remove(account);
+        boolean hasAdds = pendingAdds != null && !pendingAdds.isEmpty();
+        boolean hasRemovals = pendingRemovals != null && !pendingRemovals.isEmpty();
+        if (!hasAdds && !hasRemovals) {
             return;
         }
 
@@ -249,6 +323,10 @@ public class MayogramAutoPin {
         }
         final boolean creatingNew = filter == null;
         if (creatingNew) {
+            if (!hasAdds) {
+                // Nothing to remove from a folder that doesn't exist yet.
+                return;
+            }
             filter = new MessagesController.DialogFilter();
             filter.name = FOLDER_NAME;
             filter.id = 2;
@@ -261,10 +339,19 @@ public class MayogramAutoPin {
         final MessagesController.DialogFilter finalFilter = filter;
 
         boolean changed = false;
-        for (Long dialogId : pending) {
-            if (!finalFilter.alwaysShow.contains(dialogId)) {
-                finalFilter.alwaysShow.add(dialogId);
-                changed = true;
+        if (hasAdds) {
+            for (Long dialogId : pendingAdds) {
+                if (!finalFilter.alwaysShow.contains(dialogId)) {
+                    finalFilter.alwaysShow.add(dialogId);
+                    changed = true;
+                }
+            }
+        }
+        if (hasRemovals) {
+            for (Long dialogId : pendingRemovals) {
+                if (finalFilter.alwaysShow.remove(dialogId)) {
+                    changed = true;
+                }
             }
         }
         if (!changed && !creatingNew) {

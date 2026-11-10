@@ -752,9 +752,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(UItem.asShadow(null));
 
         // Mayogram: Help section (Ask a Question / FAQ / Features / Privacy
-        // Policy) removed - replaced with Customise + Support Us rows below.
-        // The "Mayogram" row itself now sits right below the Accounts section (see above).
-        items.add(SettingCell.Factory.of(27, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_chat, "Customise"));
+        // Policy) removed - replaced with the Support Us row below. The
+        // standalone "Customise" row was removed too - it's reachable via
+        // Mayogram -> Appearance now. The "Mayogram" row itself sits right
+        // below the Accounts section (see above).
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_gift, "Support Us ❤️"));
 
         if (SharedSettings.experimentalSettingsAllowed.get()) {
@@ -908,9 +909,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             case 25:
                 presentSettingFragment(new MayogramInfoActivity());
                 break;
-            case 27:
-                presentSettingFragment(new MayogramCustomizeActivity());
-                break;
             case 26:
                 Browser.openUrl(getContext(), "https://buymeatea.in/mayogram");
                 break;
@@ -989,7 +987,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                     }
                     break;
             }
-            return formatString(R.string.TelegramVersion, String.format(Locale.US, "v%s (%d)\n%s", pInfo.versionName, code, abi));
+            return "Mayogram " + String.format(Locale.US, "v%s (%d)\n%s", pInfo.versionName, code, abi);
         } catch (Exception e) {
             FileLog.e(e);
         }

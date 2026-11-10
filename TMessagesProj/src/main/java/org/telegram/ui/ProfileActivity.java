@@ -11552,7 +11552,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         rightIconIsStatus = true;
                         rightIconIsPremium = false;
                         nameTextView[a].setRightDrawable(getEmojiStatusDrawable(user.emoji_status, true, true, a));
-                    } else if (getMessagesController().isPremiumUser(user)) {
+                    } else if (getMessagesController().isPremiumUser(user) || (user.self && org.telegram.messenger.MayogramCustomization.isLocalPremiumEnabled())) {
                         rightIconIsStatus = false;
                         rightIconIsPremium = true;
                         nameTextView[a].setRightDrawable(getEmojiStatusDrawable(null, true, true, a));
@@ -11570,7 +11570,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (a == 1 && (rightIconIsStatus || rightIconIsPremium)) {
                     nameTextView[a].setRightDrawableOutside(true);
                 }
-                if (user.self && getMessagesController().isPremiumUser(user)) {
+                // Mayogram: Local Premium shows this own-profile badge/status-picker
+                // entry even on a non-Premium account - purely local rendering, never
+                // sent to the server and never shown for anyone else's profile.
+                if (user.self && (getMessagesController().isPremiumUser(user) || org.telegram.messenger.MayogramCustomization.isLocalPremiumEnabled())) {
                     nameTextView[a].setRightDrawableOnClick(v -> {
                         showStatusSelect();
                     });

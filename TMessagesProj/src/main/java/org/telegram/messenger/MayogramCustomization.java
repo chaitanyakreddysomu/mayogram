@@ -133,6 +133,34 @@ public class MayogramCustomization {
         prefs().edit().putBoolean("mayo_menu_" + key, visible).apply();
     }
 
+    private static final String[] ALL_MENU_KEYS = {
+            MENU_HOME_GHOST_MODE, MENU_HOME_NEW_GROUP, MENU_HOME_SCHEDULED,
+            MENU_CHAT_ADMIN_RESTRICT, MENU_CHAT_ADMIN_BOOST, MENU_CHAT_ADMIN_GO_TO_TOP,
+            MENU_CHAT_ADMIN_RECENT_ACTIONS, MENU_CHAT_ADMIN_MEMBERS, MENU_CHAT_ADMIN_INVITE_LINKS,
+            MENU_CHAT_USER_GO_TO_TOP, MENU_CHAT_USER_REPORT,
+            MENU_MSG_ADMIN_REPLY, MENU_MSG_ADMIN_COPY_LINK, MENU_MSG_ADMIN_SHOW_OWNER, MENU_MSG_ADMIN_SAVE_MUSIC, MENU_MSG_ADMIN_EDIT,
+            MENU_MSG_USER_REPLY, MENU_MSG_USER_COPY_LINK, MENU_MSG_USER_SHOW_OWNER, MENU_MSG_USER_SAVE_MUSIC, MENU_MSG_USER_EDIT,
+    };
+
+    /** Puts every toggleable menu item back to shown (its default). */
+    public static void resetAllMenuVisibility() {
+        SharedPreferences.Editor editor = prefs().edit();
+        for (String key : ALL_MENU_KEYS) {
+            editor.remove("mayo_menu_" + key);
+        }
+        editor.apply();
+    }
+
+    /** Puts every Appearance setting (folder bar, avatars, home title) back to its default. */
+    public static void resetAppearanceDefaults() {
+        prefs().edit()
+                .remove("mayo_avatar_radius_percent")
+                .remove("mayo_folder_bar_color")
+                .remove("mayo_folder_bar_radius")
+                .remove("mayo_title_mode")
+                .apply();
+    }
+
     // --- Unique Followers scan result: per-account (unlike the settings
     // above), since different logged-in accounts own different channels. ---
 

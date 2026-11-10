@@ -22,6 +22,9 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     private static final int BUTTON_VIEW_LIST = 1;
     private static final int BUTTON_RESCAN = 2;
 
+    /** A scan older than this is treated as stale and auto-refreshed on open. */
+    private static final long STALE_AFTER_MS = 24 * 60 * 60 * 1000L;
+
     private int progressDone;
     private int progressTotal;
     private int progressUnique;
@@ -35,7 +38,9 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     public boolean onFragmentCreate() {
         boolean result = super.onFragmentCreate();
         MayogramFollowersController.setListener(getCurrentAccount(), this);
-        if (!MayogramFollowersController.isScanning(getCurrentAccount()) && MayogramCustomization.getFollowersLastScan(getCurrentAccount()) == 0) {
+        long lastScan = MayogramCustomization.getFollowersLastScan(getCurrentAccount());
+        boolean stale = lastScan == 0 || System.currentTimeMillis() - lastScan > STALE_AFTER_MS;
+        if (!MayogramFollowersController.isScanning(getCurrentAccount()) && stale) {
             startScanWithNotice();
         }
         return result;
@@ -69,7 +74,8 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
             items.add(UItem.asHeader("RESULTS"));
             items.add(UItem.asButton(0, "Followers", String.valueOf(MayogramCustomization.getFollowersTotal(account))));
             items.add(UItem.asButton(0, "Unique Followers", String.valueOf(MayogramCustomization.getFollowersUnique(account))));
-            items.add(UItem.asShadow("\"Followers\" adds up every owned channel's subscriber count. \"Unique Followers\" counts each person once, even if they follow more than one of your channels."));
+            items.add(UItem.asShadow("\"Followers\" adds up every owned channel's subscriber count. \"Unique Followers\" counts each person once, even if they follow more than one of your channels. Last scanned "
+                    + formatAgo(MayogramCustomization.getFollowersLastScan(account)) + ". Rescans automatically when this is over a day old."));
 
             items.add(UItem.asButton(BUTTON_VIEW_LIST, "View All Followers"));
             items.add(UItem.asButton(BUTTON_RESCAN, "Rescan"));
@@ -92,6 +98,23 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     @Override
     protected boolean onLongClick(UItem item, View view, int position, float x, float y) {
         return false;
+    }
+
+    private static String formatAgo(long timeMs) {
+        long diff = System.currentTimeMillis() - timeMs;
+        long minutes = diff / 60000;
+        if (minutes < 1) {
+            return "just now";
+        }
+        if (minutes < 60) {
+            return minutes + (minutes == 1 ? " minute ago" : " minutes ago");
+        }
+        long hours = minutes / 60;
+        if (hours < 24) {
+            return hours + (hours == 1 ? " hour ago" : " hours ago");
+        }
+        long days = hours / 24;
+        return days + (days == 1 ? " day ago" : " days ago");
     }
 
     @Override

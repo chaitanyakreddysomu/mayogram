@@ -39,11 +39,11 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 public class MayogramCustomizeActivity extends UniversalFragment {
 
-    private static final int BUTTON_APP_ICON = 1;
     private static final int BUTTON_FOLDER_COLOR = 2;
     private static final int SLIDER_FOLDER_RADIUS = 3;
     private static final int SLIDER_AVATAR_SHAPE = 4;
     private static final int BUTTON_TITLE_MODE = 5;
+    private static final int BUTTON_RESET = 6;
 
     private static final int[] SWATCHES = {
             0, // "default" / theme color
@@ -58,10 +58,6 @@ public class MayogramCustomizeActivity extends UniversalFragment {
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        items.add(UItem.asHeader("APP ICON"));
-        items.add(UItem.asButton(BUTTON_APP_ICON, R.drawable.msg2_discussion, "App Icon", "Choose from available icons"));
-        items.add(UItem.asShadow("Changing the icon may restart the app for a moment."));
-
         items.add(UItem.asHeader("FOLDERS BAR"));
         items.add(UItem.asButton(BUTTON_FOLDER_COLOR, folderColorLabel()));
         items.add(UItem.asIntSlideView(
@@ -88,6 +84,9 @@ public class MayogramCustomizeActivity extends UniversalFragment {
         items.add(UItem.asHeader("HOME SCREEN TITLE"));
         items.add(UItem.asButton(BUTTON_TITLE_MODE, titleModeLabel()));
         items.add(UItem.asShadow("What shows at the top of your Chats list."));
+
+        items.add(UItem.asButton(BUTTON_RESET, "Reset to Defaults").red());
+        items.add(UItem.asShadow(null));
     }
 
     private CharSequence folderColorLabel() {
@@ -108,12 +107,13 @@ public class MayogramCustomizeActivity extends UniversalFragment {
 
     @Override
     protected void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == BUTTON_APP_ICON) {
-            presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC));
-        } else if (item.id == BUTTON_FOLDER_COLOR) {
+        if (item.id == BUTTON_FOLDER_COLOR) {
             showColorPicker();
         } else if (item.id == BUTTON_TITLE_MODE) {
             showTitleModePicker();
+        } else if (item.id == BUTTON_RESET) {
+            MayogramCustomization.resetAppearanceDefaults();
+            listView.adapter.update(true);
         }
     }
 
