@@ -36,7 +36,8 @@ public class MayogramLocalPremiumActivity extends UniversalFragment {
             "On this device only, lets you:\n" +
             "• Set an emoji status\n" +
             "• See animated emoji in messages\n" +
-            "• Show a profile badge\n\n" +
+            "• Show a profile badge\n" +
+            "• Customise channel appearance (color, wallpaper, reply/profile icon, emoji status, emoji pack) without a boost level\n\n" +
             "This is local to this app only - it does not buy or activate real Telegram Premium. " +
             "Opening this same account in stock Telegram (or any other client) shows a normal, " +
             "non-Premium account."

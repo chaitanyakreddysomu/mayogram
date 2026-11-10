@@ -22,6 +22,7 @@ import android.widget.TextView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
+import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
@@ -40,6 +41,7 @@ public class MayogramInfoActivity extends UniversalFragment {
     private static final int BUTTON_MENUS = 5;
     private static final int BUTTON_FOLLOWERS = 6;
     private static final int BUTTON_CHANNEL = 4;
+    private static final int BUTTON_REPORT_BUG = 7;
 
     @Override
     protected CharSequence getTitle() {
@@ -61,6 +63,7 @@ public class MayogramInfoActivity extends UniversalFragment {
 
         items.add(UItem.asHeader("LINKS"));
         items.add(UItem.asButton(BUTTON_CHANNEL, R.drawable.msg2_discussion, "Channel", "@mayogram"));
+        items.add(UItem.asButton(BUTTON_REPORT_BUG, R.drawable.msg_report, "Found Any Bugs"));
         items.add(UItem.asShadow(null));
     }
 
@@ -123,6 +126,8 @@ public class MayogramInfoActivity extends UniversalFragment {
             presentFragment(new MayogramUniqueFollowersActivity());
         } else if (item.id == BUTTON_CHANNEL) {
             getMessagesController().openByUserName("mayogram", this, 1);
+        } else if (item.id == BUTTON_REPORT_BUG) {
+            Browser.openUrl(getContext(), "https://forms.gle/V6M2LjA3MHchUroX7");
         }
     }
 

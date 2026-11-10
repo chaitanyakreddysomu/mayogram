@@ -7459,7 +7459,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (message == null || parentFragment == null) {
             return false;
         }
-        final boolean isPremium = UserConfig.getInstance(currentAccount).isPremium();
+        final boolean isPremium = UserConfig.getInstance(currentAccount).isPremium() || org.telegram.messenger.MayogramCustomization.isLocalPremiumEnabled();
         if (!isPremium && UserConfig.getInstance(currentAccount).getClientUserId() != dialogId && message instanceof Spanned) {
             AnimatedEmojiSpan[] animatedEmojis = ((Spanned) message).getSpans(0, message.length(), AnimatedEmojiSpan.class);
             if (animatedEmojis != null) {

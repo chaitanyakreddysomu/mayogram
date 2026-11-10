@@ -2921,6 +2921,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 .add(NotificationCenter.needDeleteDialog)
                 .add(NotificationCenter.folderBecomeEmpty)
                 .add(NotificationCenter.newSuggestionsAvailable)
+                .add(NotificationCenter.mayogramTitleModeChanged)
                 .add(NotificationCenter.dialogsUnreadReactionsCounterChanged)
                 .add(NotificationCenter.dialogsUnreadPollVotesCounterChanged)
                 .add(NotificationCenter.forceImportContactsStart)
@@ -10585,7 +10586,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @SuppressWarnings("unchecked")
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.dialogsNeedReload) {
+        if (id == NotificationCenter.mayogramTitleModeChanged) {
+            updateGhostModeTitle();
+        } else if (id == NotificationCenter.dialogsNeedReload) {
             if (viewPages == null || dialogsListFrozen) {
                 return;
             }

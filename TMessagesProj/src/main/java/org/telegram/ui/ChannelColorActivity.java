@@ -122,6 +122,14 @@ public class ChannelColorActivity extends BaseFragment implements NotificationCe
 
     public Drawable backgroundDrawable;
 
+    private void applyRealLevel(int realLevel, TLRPC.Chat chat) {
+        if (chat != null) {
+            chat.level = realLevel;
+        }
+        this.currentLevel = org.telegram.messenger.MayogramCustomization.isLocalPremiumEnabled()
+                ? Math.max(realLevel, 1000) : realLevel;
+    }
+
     public int minLevelRequired() {
         int lvl = 0;
         if (currentReplyColor != selectedReplyColor) {
@@ -278,16 +286,15 @@ public class ChannelColorActivity extends BaseFragment implements NotificationCe
 
         TLRPC.Chat chat = getMessagesController().getChat(-dialogId);
         if (chat != null) {
-            currentLevel = chat.level;
+            applyRealLevel(chat.level, chat);
         }
         MessagesController.getInstance(currentAccount).getBoostsController().getBoostsStats(dialogId, boostsStatus -> {
             this.boostsStatus = boostsStatus;
             if (boostsStatus != null) {
-                this.currentLevel = boostsStatus.level;
                 if (chat != null) {
                     chat.flags |= 1024;
-                    chat.level = currentLevel;
                 }
+                applyRealLevel(boostsStatus.level, chat);
             }
             updateButton(true);
             if (button != null) {
@@ -2618,10 +2625,7 @@ public class ChannelColorActivity extends BaseFragment implements NotificationCe
         if (boostsStatus != null) {
             TLRPC.Chat chat = getMessagesController().getChat(-dialogId);
             this.boostsStatus = boostsStatus;
-            this.currentLevel = boostsStatus.level;
-            if (chat != null) {
-                chat.level = currentLevel;
-            }
+            applyRealLevel(boostsStatus.level, chat);
             if (adapter != null) {
                 adapter.notifyDataSetChanged();
             }

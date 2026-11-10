@@ -113,6 +113,7 @@ public class MayogramCustomizeActivity extends UniversalFragment {
             showTitleModePicker();
         } else if (item.id == BUTTON_RESET) {
             MayogramCustomization.resetAppearanceDefaults();
+            getNotificationCenter().postNotificationName(org.telegram.messenger.NotificationCenter.mayogramTitleModeChanged);
             listView.adapter.update(true);
         }
     }
@@ -169,6 +170,7 @@ public class MayogramCustomizeActivity extends UniversalFragment {
         builder.setTitle("Home Screen Title");
         builder.setItems(options, (dialog, which) -> {
             MayogramCustomization.setTitleMode(modes[which]);
+            getNotificationCenter().postNotificationName(org.telegram.messenger.NotificationCenter.mayogramTitleModeChanged);
             listView.adapter.update(true);
         });
         showDialog(builder.create());
