@@ -1,9 +1,22 @@
 {
-  "latestVersion": "2.0.1",
-  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.0.1/app.apk",
-  "changelog": "v2.0.1 - The app no longer jumps into the mayogram chat by itself after updating",
+  "latestVersion": "2.1.0",
+  "downloadUrl": "https://github.com/chaitanyakreddysomu/mayogram/releases/download/v2.1.0/app.apk",
+  "changelog": "v2.1.0 - New Mayogram settings section, Local Premium, Followers tools, and channel/group management",
   "features": [
-    "Opening the app after an update no longer automatically takes you into the mayogram chat",
-    "The mayogram channel still shows pinned at the top of your chat list as before"
+    "New \"Mayogram\" section in Settings: General, Appearance, Local Premium, Menus, and Followers",
+    "Choose what shows on your Chats screen title - app name, first name, or full name - updates instantly",
+    "Customize the folder bar's selected color and corner roundness",
+    "Change how rounded profile pictures look everywhere in the app",
+    "Show or hide individual menu items on the home screen, chat header, and message options, with a live preview",
+    "\"Reset to Defaults\" buttons on Appearance and Menus",
+    "A direct \"Found Any Bugs\" link to report issues",
+    "Local Premium: show a Premium-style badge and emoji status on your own profile, and send/view animated emoji in messages - device-only, cosmetic",
+    "Followers: scan every channel you own and see total and unique follower counts, with a live view as each channel finishes",
+    "Followers: export your full follower list as a CSV to open in Excel or share",
+    "Channels & Groups: see every channel/group you're in with your role, search by name, filter by type or role",
+    "Channels & Groups: Rescan to refresh the list, Deep Scan to double-check with Telegram's servers if an old channel seems to be missing",
+    "Fixed forwarding from an unrestricted chat being sent slowly one-by-one instead of all at once",
+    "Fixed the app name sometimes showing \"Telegram\" instead of \"Mayogram\"",
+    "Fixed follower names showing as blank/numbers after restarting the app"
   ]
 }
