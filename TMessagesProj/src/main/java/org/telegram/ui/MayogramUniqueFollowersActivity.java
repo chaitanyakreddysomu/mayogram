@@ -103,13 +103,18 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         int account = getCurrentAccount();
-        if (MayogramFollowersController.isScanning(account)) {
+        if (MayogramFollowersController.isDiscoveringChannels(account)) {
+            items.add(UItem.asCustom(buildCenteredHeader(getContext(), "FINDING YOUR CHANNELS")));
+            items.add(UItem.asShadow("Looking for every channel you own before scanning their followers..."));
+        } else if (MayogramFollowersController.isScanning(account)) {
             items.add(UItem.asCustom(buildCenteredHeader(getContext(), "SCANNING")));
             String text = progressTotal > 0
                     ? progressDone + " of " + progressTotal + " channels - " + progressUnique + " unique followers"
                     : "Starting...";
             items.add(UItem.asShadow(text));
-            for (int i = 0; i < scannedChannels.size(); i++) {
+            // Newest-scanned channel goes on top, so the list reads like a
+            // feed of what just finished rather than growing downward.
+            for (int i = scannedChannels.size() - 1; i >= 0; i--) {
                 ScannedChannel scanned = scannedChannels.get(i);
                 TLRPC.Chat chat = getMessagesController().getChat(scanned.chatId);
                 if (chat != null) {
@@ -127,6 +132,7 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
             items.add(UItem.asButton(BUTTON_EXPORT, exporting ? "Exporting..." : "Export as CSV"));
             items.add(UItem.asShadow(null));
 
+            items.add(UItem.asHeader("UNIQUE FOLLOWERS LIST"));
             ArrayList<Long> ids = MayogramCustomization.getFollowersIds(account);
             for (int i = 0; i < ids.size(); i++) {
                 long id = ids.get(i);
@@ -230,6 +236,13 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
         }
         long days = hours / 24;
         return days + (days == 1 ? " day ago" : " days ago");
+    }
+
+    @Override
+    public void onChannelsDiscovered(int channelCount) {
+        if (listView != null) {
+            listView.adapter.update(true);
+        }
     }
 
     @Override

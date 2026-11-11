@@ -27,6 +27,8 @@ import java.util.List;
 public class MayogramFollowersController {
 
     public interface ScanListener {
+        /** Fired once channel discovery finishes, right before per-channel scanning starts. */
+        void onChannelsDiscovered(int channelCount);
         void onProgress(int channelsDone, int channelsTotal, int uniqueSoFar);
         /** Fired once, right when a single owned channel finishes scanning. */
         void onChannelScanned(TLRPC.Chat chat, int channelFollowers, int channelsDone, int channelsTotal);
@@ -37,10 +39,16 @@ public class MayogramFollowersController {
     private static final int NOTIFICATION_ID = 93001;
 
     private static final HashMap<Integer, Boolean> scanningByAccount = new HashMap<>();
+    private static final HashMap<Integer, Boolean> discoveringByAccount = new HashMap<>();
     private static final HashMap<Integer, ScanListener> listenerByAccount = new HashMap<>();
 
     public static boolean isScanning(int account) {
         return Boolean.TRUE.equals(scanningByAccount.get(account));
+    }
+
+    /** True only during the first pass that finds every channel this account owns, before the per-channel follower fetch starts. */
+    public static boolean isDiscoveringChannels(int account) {
+        return Boolean.TRUE.equals(discoveringByAccount.get(account));
     }
 
     public static void setListener(int account, ScanListener listener) {
@@ -96,18 +104,21 @@ public class MayogramFollowersController {
             return;
         }
         scanningByAccount.put(account, true);
+        discoveringByAccount.put(account, true);
 
         // The local dialog list is paginated in from the server and may not be
         // fully synced yet (especially the archive folder, which most users
         // never scroll into) - an owned channel missing from it would silently
-        // undercount. Make sure both the main and archive folders are fully
-        // loaded before reading from them.
+        // undercount, and a stale partial list is exactly why the "owned
+        // channels" count could come out different from one scan to the
+        // next. Make sure both the main and archive folders are FULLY
+        // loaded (not just "loaded enough") before reading from them.
         ensureDialogsLoaded(account, 0, 0, () ->
             ensureDialogsLoaded(account, 1, 0, () ->
                 beginScan(account)));
     }
 
-    private static final int MAX_LOAD_DIALOGS_ATTEMPTS = 100;
+    private static final int MAX_LOAD_DIALOGS_ATTEMPTS = 400;
 
     private static void ensureDialogsLoaded(int account, int folderId, int attempt, Runnable onDone) {
         MessagesController controller = MessagesController.getInstance(account);
@@ -122,16 +133,59 @@ public class MayogramFollowersController {
     }
 
     private static void beginScan(int account) {
-        ArrayList<TLRPC.Chat> ownedChannels = new ArrayList<>();
+        // The locally cached creator flag on a dialog's chat object isn't
+        // always fresh (it's whatever was last echoed to this device) - that
+        // staleness is the likely reason the owned-channel count has come
+        // out different between runs. Every channel dialog is treated as a
+        // candidate here, and ownership is decided only from a fresh
+        // server answer (channels.getChannels), never from the local cache.
+        ArrayList<TLRPC.Chat> candidateChannels = new ArrayList<>();
         ArrayList<TLRPC.Dialog> dialogs = MessagesController.getInstance(account).getAllDialogs();
         for (int i = 0; i < dialogs.size(); i++) {
             TLRPC.Dialog dialog = dialogs.get(i);
             if (dialog != null && DialogObject.isChatDialog(dialog.id)) {
                 TLRPC.Chat chat = MessagesController.getInstance(account).getChat(-dialog.id);
-                if (chat != null && chat.creator && ChatObject.isChannel(chat)) {
-                    ownedChannels.add(chat);
+                if (chat != null && ChatObject.isChannel(chat)) {
+                    candidateChannels.add(chat);
                 }
             }
+        }
+        verifyOwnedChannels(account, candidateChannels, 0, new ArrayList<>());
+    }
+
+    private static final int VERIFY_OWNERSHIP_BATCH_SIZE = 100;
+
+    private static void verifyOwnedChannels(int account, List<TLRPC.Chat> candidates, int offset, ArrayList<TLRPC.Chat> ownedSoFar) {
+        if (offset >= candidates.size()) {
+            finishDiscovery(account, ownedSoFar);
+            return;
+        }
+        int end = Math.min(offset + VERIFY_OWNERSHIP_BATCH_SIZE, candidates.size());
+        TLRPC.TL_channels_getChannels req = new TLRPC.TL_channels_getChannels();
+        for (int i = offset; i < end; i++) {
+            req.id.add(MessagesController.getInstance(account).getInputChannel(candidates.get(i).id));
+        }
+        ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
+            if (response instanceof TLRPC.TL_messages_chats) {
+                TLRPC.TL_messages_chats res = (TLRPC.TL_messages_chats) response;
+                MessagesController.getInstance(account).putChats(res.chats, false);
+                for (int i = 0; i < res.chats.size(); i++) {
+                    TLRPC.Chat chat = res.chats.get(i);
+                    if (chat != null && chat.creator) {
+                        ownedSoFar.add(chat);
+                    }
+                }
+            }
+            AndroidUtilities.runOnUIThread(() -> verifyOwnedChannels(account, candidates, end, ownedSoFar));
+        });
+    }
+
+    private static void finishDiscovery(int account, ArrayList<TLRPC.Chat> ownedChannels) {
+        discoveringByAccount.put(account, false);
+        ScanListener listener = listenerByAccount.get(account);
+        if (listener != null) {
+            int count = ownedChannels.size();
+            AndroidUtilities.runOnUIThread(() -> listener.onChannelsDiscovered(count));
         }
 
         ScanState state = new ScanState();
