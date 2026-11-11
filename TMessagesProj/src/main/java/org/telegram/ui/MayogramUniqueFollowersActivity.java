@@ -1,16 +1,24 @@
 /*
- * Mayogram: Settings -> Mayogram -> General -> Unique Followers. Scans every
- * channel the account owns and shows how many people follow at least one of
- * them (someone following several owned channels only counts once).
+ * Mayogram: Settings -> Mayogram -> Followers. Scans every channel the
+ * account owns and shows how many people follow at least one of them
+ * (someone following several owned channels only counts once), then lists
+ * every one of them inline.
  */
 package org.telegram.ui;
 
+import android.content.Context;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.TextView;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.MayogramCustomization;
 import org.telegram.messenger.MayogramExportController;
 import org.telegram.messenger.MayogramFollowersController;
 import org.telegram.messenger.R;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
@@ -18,9 +26,10 @@ import org.telegram.ui.Components.UniversalFragment;
 
 import java.util.ArrayList;
 
+import static org.telegram.messenger.AndroidUtilities.dp;
+
 public class MayogramUniqueFollowersActivity extends UniversalFragment implements MayogramFollowersController.ScanListener {
 
-    private static final int BUTTON_VIEW_LIST = 1;
     private static final int BUTTON_RESCAN = 2;
     private static final int BUTTON_EXPORT = 3;
 
@@ -32,15 +41,30 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     private int progressUnique;
     private boolean exporting;
 
+    private static class ScannedChannel {
+        final long chatId;
+        final int followers;
+        ScannedChannel(long chatId, int followers) {
+            this.chatId = chatId;
+            this.followers = followers;
+        }
+    }
+    private final ArrayList<ScannedChannel> scannedChannels = new ArrayList<>();
+
     @Override
     protected CharSequence getTitle() {
-        return "Unique Followers";
+        return "Followers";
     }
 
     @Override
     public boolean onFragmentCreate() {
         boolean result = super.onFragmentCreate();
         MayogramFollowersController.setListener(getCurrentAccount(), this);
+        MayogramFollowersController.ensureUsersCached(getCurrentAccount(), MayogramCustomization.getFollowersIds(getCurrentAccount()), () -> {
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+        });
         long lastScan = MayogramCustomization.getFollowersLastScan(getCurrentAccount());
         boolean stale = lastScan == 0 || System.currentTimeMillis() - lastScan > STALE_AFTER_MS;
         if (!MayogramFollowersController.isScanning(getCurrentAccount()) && stale) {
@@ -56,6 +80,7 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     }
 
     private void startScanWithNotice() {
+        scannedChannels.clear();
         BulletinFactory.of(this).createSimpleBulletin(R.drawable.msg_retry,
                 "Scanning your owned channels - this can take a while. We'll let you know when it's done.").show();
         MayogramFollowersController.startScan(getCurrentAccount());
@@ -64,37 +89,66 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
         }
     }
 
+    private View buildCenteredHeader(Context context, String text) {
+        TextView textView = new TextView(context);
+        textView.setText(text);
+        textView.setGravity(Gravity.CENTER);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        textView.setTypeface(AndroidUtilities.bold());
+        textView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
+        textView.setPadding(dp(16), dp(12), dp(16), dp(8));
+        return textView;
+    }
+
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         int account = getCurrentAccount();
         if (MayogramFollowersController.isScanning(account)) {
-            items.add(UItem.asHeader("SCANNING"));
+            items.add(UItem.asCustom(buildCenteredHeader(getContext(), "SCANNING")));
             String text = progressTotal > 0
-                    ? "Channel " + (progressDone + 1) + " of " + progressTotal + " - " + progressUnique + " unique so far"
+                    ? progressDone + " of " + progressTotal + " channels - " + progressUnique + " unique followers"
                     : "Starting...";
             items.add(UItem.asShadow(text));
+            for (int i = 0; i < scannedChannels.size(); i++) {
+                ScannedChannel scanned = scannedChannels.get(i);
+                TLRPC.Chat chat = getMessagesController().getChat(scanned.chatId);
+                if (chat != null) {
+                    UItem item = UItem.asProfileCell(chat);
+                    item.subtext = scanned.followers + (scanned.followers == 1 ? " follower" : " followers");
+                    items.add(item);
+                }
+            }
         } else if (MayogramCustomization.getFollowersLastScan(account) != 0) {
-            items.add(UItem.asHeader("RESULTS"));
             items.add(UItem.asButton(0, "Followers", String.valueOf(MayogramCustomization.getFollowersTotal(account))));
             items.add(UItem.asButton(0, "Unique Followers", String.valueOf(MayogramCustomization.getFollowersUnique(account))));
-            items.add(UItem.asShadow("\"Followers\" adds up every owned channel's subscriber count. \"Unique Followers\" counts each person once, even if they follow more than one of your channels. Last scanned "
-                    + formatAgo(MayogramCustomization.getFollowersLastScan(account)) + ". Rescans automatically when this is over a day old."));
+            items.add(UItem.asShadow("Last scanned " + formatAgo(MayogramCustomization.getFollowersLastScan(account)) + "."));
 
-            items.add(UItem.asButton(BUTTON_VIEW_LIST, "View All Followers"));
             items.add(UItem.asButton(BUTTON_RESCAN, "Rescan"));
             items.add(UItem.asButton(BUTTON_EXPORT, exporting ? "Exporting..." : "Export as CSV"));
-            items.add(UItem.asShadow("Exports telegram_userid, username, first_name, last_name, phone_number as a CSV you can open in Excel or share. Phone numbers will be blank for almost everyone - Telegram only shares a phone number with accounts that already have that person as a contact."));
+            items.add(UItem.asShadow(null));
+
+            ArrayList<Long> ids = MayogramCustomization.getFollowersIds(account);
+            for (int i = 0; i < ids.size(); i++) {
+                long id = ids.get(i);
+                TLRPC.User user = getMessagesController().getUser(id);
+                if (user == null) {
+                    user = new TLRPC.TL_user();
+                    user.id = id;
+                }
+                items.add(UItem.asProfileCell(user));
+            }
+            if (ids.isEmpty()) {
+                items.add(UItem.asShadow("No followers found."));
+            }
         } else {
-            items.add(UItem.asHeader("UNIQUE FOLLOWERS"));
+            items.add(UItem.asHeader("FOLLOWERS"));
             items.add(UItem.asShadow("Starting scan..."));
         }
     }
 
     @Override
     protected void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == BUTTON_VIEW_LIST) {
-            presentFragment(new MayogramFollowersListActivity());
-        } else if (item.id == BUTTON_RESCAN) {
+        if (item.id == BUTTON_RESCAN) {
             startScanWithNotice();
         } else if (item.id == BUTTON_EXPORT) {
             startExport();
@@ -183,6 +237,14 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
         progressDone = channelsDone;
         progressTotal = channelsTotal;
         progressUnique = uniqueSoFar;
+        if (listView != null) {
+            listView.adapter.update(true);
+        }
+    }
+
+    @Override
+    public void onChannelScanned(TLRPC.Chat chat, int channelFollowers, int channelsDone, int channelsTotal) {
+        scannedChannels.add(new ScannedChannel(chat.id, channelFollowers));
         if (listView != null) {
             listView.adapter.update(true);
         }

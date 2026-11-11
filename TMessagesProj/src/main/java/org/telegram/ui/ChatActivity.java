@@ -14652,18 +14652,21 @@ public class ChatActivity extends BaseFragment implements
                 chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
             }
         }
-        // Mayogram: bulk forwards (>1 message, not scheduled) into this chat
-        // go out one message at a time (MAYO_FORWARD_CHUNK_SIZE) instead of
-        // one big batch, with a "sent X of Y" progress bar - each message's
-        // delivery confirmation ticks it forward via
-        // mayoOnForwardMessageDelivered, which also sends the next one. This
-        // is what makes Cancel immediate: it just stops queuing anything
-        // further, so whichever single message is already in flight when
-        // Cancel is pressed finishes (can't be recalled), but the one after
-        // it never goes out. A single sendMessage() call forwarding all of
-        // them at once would hit the server as one atomic request - nothing
-        // left to interrupt by the time any progress is visible.
-        if (scheduleDate == 0 && arrayList.size() > 1) {
+        // Mayogram: bulk forwards (>1 message, not scheduled) from a
+        // RESTRICTED source go out one message at a time
+        // (MAYO_FORWARD_CHUNK_SIZE) instead of one big batch, with a "sent X
+        // of Y" progress bar - each message's delivery confirmation ticks it
+        // forward via mayoOnForwardMessageDelivered, which also sends the
+        // next one. This is what makes Cancel immediate: it just stops
+        // queuing anything further, so whichever single message is already
+        // in flight when Cancel is pressed finishes (can't be recalled), but
+        // the one after it never goes out. A single sendMessage() call
+        // forwarding all of them at once would hit the server as one atomic
+        // request - nothing left to interrupt by the time any progress is
+        // visible. An unrestricted source never takes that slow local
+        // re-upload path, so there's nothing for this UI to protect - it
+        // just forwards everything at once, like stock Telegram.
+        if (scheduleDate == 0 && arrayList.size() > 1 && getSendMessagesHelper().anyNeedsOwnerCacheReupload(arrayList)) {
             mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
             mayoForwardQueue = arrayList;
             mayoForwardQueueNextIndex = 0;

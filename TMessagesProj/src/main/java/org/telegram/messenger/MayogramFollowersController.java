@@ -28,6 +28,8 @@ public class MayogramFollowersController {
 
     public interface ScanListener {
         void onProgress(int channelsDone, int channelsTotal, int uniqueSoFar);
+        /** Fired once, right when a single owned channel finishes scanning. */
+        void onChannelScanned(TLRPC.Chat chat, int channelFollowers, int channelsDone, int channelsTotal);
         void onComplete(int totalFollowers, int uniqueFollowers);
     }
 
@@ -144,6 +146,7 @@ public class MayogramFollowersController {
         int channelIndex;
         int offset;
         int totalFollowers;
+        int currentChannelFollowers;
         final HashSet<Long> uniqueFollowers = new HashSet<>();
     }
 
@@ -168,6 +171,7 @@ public class MayogramFollowersController {
                 TLRPC.TL_channels_channelParticipants res = (TLRPC.TL_channels_channelParticipants) response;
                 if (state.offset == 0) {
                     state.totalFollowers += res.count;
+                    state.currentChannelFollowers = res.count;
                 }
                 // Cache the real user objects (name, avatar) the server already sent
                 // us here, so the followers list can show them - no extra lookups.
@@ -184,12 +188,14 @@ public class MayogramFollowersController {
                     state.offset += PAGE_LIMIT;
                     fetchParticipantsPage(state);
                 } else {
+                    notifyChannelScanned(state, chat, state.currentChannelFollowers);
                     state.channelIndex++;
                     scanNextChannel(state);
                 }
             } else {
                 // Couldn't read this channel's participant list (e.g. temporary
                 // server error) - skip it rather than aborting the whole scan.
+                notifyChannelScanned(state, chat, state.currentChannelFollowers);
                 state.channelIndex++;
                 scanNextChannel(state);
             }
@@ -203,6 +209,15 @@ public class MayogramFollowersController {
             int total = state.channels.size();
             int unique = state.uniqueFollowers.size();
             AndroidUtilities.runOnUIThread(() -> listener.onProgress(done, total, unique));
+        }
+    }
+
+    private static void notifyChannelScanned(ScanState state, TLRPC.Chat chat, int channelFollowers) {
+        ScanListener listener = listenerByAccount.get(state.account);
+        if (listener != null) {
+            int done = state.channelIndex + 1;
+            int total = state.channels.size();
+            AndroidUtilities.runOnUIThread(() -> listener.onChannelScanned(chat, channelFollowers, done, total));
         }
     }
 

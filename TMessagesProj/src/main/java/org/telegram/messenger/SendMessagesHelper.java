@@ -2090,6 +2090,25 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
 
     /**
+     * True if any of these messages' source chat is actually restricted
+     * (noforwards) - i.e. will take the slow one-at-a-time local re-upload
+     * path. Callers use this to decide whether a chunked "sent X of Y /
+     * Cancel" forwarding UI is actually needed, instead of always showing
+     * it for any multi-message forward.
+     */
+    public boolean anyNeedsOwnerCacheReupload(List<MessageObject> messages) {
+        if (messages == null) {
+            return false;
+        }
+        for (int i = 0; i < messages.size(); i++) {
+            if (isOwnerCacheReuploadAllowed(messages.get(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Mayogram: owner-only exception to the restriction above. Returns true only when the source
      * chat/message IS restricted AND the current user is the creator (owner) of the source channel/group,
      * so the owner can move their own content between their own chats by re-uploading from local files.
