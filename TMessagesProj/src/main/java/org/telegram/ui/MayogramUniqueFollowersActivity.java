@@ -260,6 +260,11 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
         scannedChannels.add(new ScannedChannel(chat.id, channelFollowers));
         if (listView != null) {
             listView.adapter.update(true);
+            // Each new channel lands at the top of the list, so once there
+            // are more than fit on screen, jump back to the top with it -
+            // otherwise it appears above whatever's currently in view and
+            // the user has to manually scroll up every time to see it.
+            listView.layoutManager.scrollToPositionWithOffset(0, 0);
         }
     }
 

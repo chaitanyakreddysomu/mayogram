@@ -113,9 +113,13 @@ public class MayogramFollowersController {
         // channels" count could come out different from one scan to the
         // next. Make sure both the main and archive folders are FULLY
         // loaded (not just "loaded enough") before reading from them.
+        ensureAllDialogsLoaded(account, () -> beginScan(account));
+    }
+
+    /** Forces both the main and archive folders to fully paginate in before trusting getAllDialogs(). Reused anywhere a feature needs the complete dialog list, not just whatever's loaded so far. */
+    public static void ensureAllDialogsLoaded(int account, Runnable onDone) {
         ensureDialogsLoaded(account, 0, 0, () ->
-            ensureDialogsLoaded(account, 1, 0, () ->
-                beginScan(account)));
+            ensureDialogsLoaded(account, 1, 0, onDone));
     }
 
     private static final int MAX_LOAD_DIALOGS_ATTEMPTS = 400;
