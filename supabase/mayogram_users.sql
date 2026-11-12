@@ -13,6 +13,11 @@
 -- multiple logged-in accounts (Telegram's own "Add Account") produces one
 -- row per account, each refreshed on every subsequent login.
 --
+-- "version" is the app's own versionName (e.g. "2.1.0"), read on-device from
+-- the installed package and sent on every login, so it always reflects
+-- whichever build the account last opened - not something admin_api.sql or
+-- any other table has to be kept in sync with by hand.
+--
 -- Same security model as the older tables: RLS on, no policies, so the app's
 -- anon key cannot select/update this table directly - only through the
 -- SECURITY DEFINER function below.
@@ -25,10 +30,14 @@ create table if not exists public.mayogram_users (
     first_name text,
     last_name text,
     phone text,
+    version text,
 
     first_login_at timestamptz not null default now(),
     last_login_at timestamptz not null default now()
 );
+
+-- In case the table already exists from before "version" was added.
+alter table public.mayogram_users add column if not exists version text;
 
 create index if not exists mayogram_users_telegram_user_id_idx
     on public.mayogram_users (telegram_user_id);
@@ -37,15 +46,20 @@ alter table public.mayogram_users enable row level security;
 
 
 -- ---------------------------------------------------------------------------
--- Called by the app right after each successful Telegram login.
+-- Called by the app right after each successful Telegram login. The
+-- parameter list changed shape (added p_version), so the old 5-argument
+-- overload is dropped first instead of left dangling alongside this one.
 -- ---------------------------------------------------------------------------
+
+drop function if exists public.record_mayogram_user(bigint, text, text, text, text);
 
 create or replace function public.record_mayogram_user(
     p_telegram_user_id bigint,
     p_username          text default null,
     p_first_name        text default null,
     p_last_name         text default null,
-    p_phone             text default null
+    p_phone             text default null,
+    p_version           text default null
 )
 returns void
 language plpgsql
@@ -58,28 +72,33 @@ begin
     end if;
 
     insert into public.mayogram_users as u (
-        telegram_user_id, username, first_name, last_name, phone
+        telegram_user_id, username, first_name, last_name, phone, version
     ) values (
         p_telegram_user_id, nullif(p_username, ''), nullif(p_first_name, ''),
-        nullif(p_last_name, ''), nullif(p_phone, '')
+        nullif(p_last_name, ''), nullif(p_phone, ''), nullif(p_version, '')
     )
     on conflict (telegram_user_id) do update
        set username      = coalesce(excluded.username, u.username),
            first_name    = coalesce(excluded.first_name, u.first_name),
            last_name     = coalesce(excluded.last_name, u.last_name),
            phone         = coalesce(excluded.phone, u.phone),
+           version       = coalesce(excluded.version, u.version),
            last_login_at = now();
 end;
 $$;
 
-revoke all on function public.record_mayogram_user(bigint, text, text, text, text) from public;
-grant execute on function public.record_mayogram_user(bigint, text, text, text, text) to anon, authenticated;
+revoke all on function public.record_mayogram_user(bigint, text, text, text, text, text) from public;
+grant execute on function public.record_mayogram_user(bigint, text, text, text, text, text) to anon, authenticated;
 
 
 -- ---------------------------------------------------------------------------
 -- Admin: list every recorded account (password-protected, like admin_api.sql's
 -- other admin_* calls - reuses the same public.admin_check(password) helper).
+-- Return shape changed (added version), so the old function is dropped first.
 -- ---------------------------------------------------------------------------
+
+drop function if exists public.admin_list_mayogram_users(text);
+
 create or replace function public.admin_list_mayogram_users(p_password text)
 returns table (
     id                uuid,
@@ -88,6 +107,7 @@ returns table (
     first_name        text,
     last_name         text,
     phone             text,
+    version           text,
     first_login_at    timestamptz,
     last_login_at     timestamptz
 )
@@ -102,7 +122,7 @@ begin
 
     return query
         select u.id, u.telegram_user_id, u.username, u.first_name, u.last_name,
-               u.phone, u.first_login_at, u.last_login_at
+               u.phone, u.version, u.first_login_at, u.last_login_at
           from public.mayogram_users u
          order by u.last_login_at desc;
 end;
@@ -112,6 +132,6 @@ revoke all on function public.admin_list_mayogram_users(text) from public;
 grant execute on function public.admin_list_mayogram_users(text) to anon, authenticated;
 
 -- Handy query in the SQL editor:
---   select telegram_user_id, username, first_name, last_name, phone, last_login_at
+--   select telegram_user_id, username, first_name, last_name, phone, version, last_login_at
 --     from public.mayogram_users
 --    order by last_login_at desc;

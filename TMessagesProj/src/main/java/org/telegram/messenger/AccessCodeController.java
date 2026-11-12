@@ -7,10 +7,17 @@
  * flow. One row is written per Telegram account, so logging into a second,
  * third, etc. account on the same install (Telegram's own "Add Account")
  * produces one row each.
+ *
+ * Every row also carries the app's own versionName, read straight from the
+ * installed package - refreshed on login, and again once per app open via
+ * recordAppVersionOnce(), so the table always reflects whichever build an
+ * account last actually used, not just whichever build they first logged
+ * in with.
  */
 
 package org.telegram.messenger;
 
+import android.content.pm.PackageInfo;
 import android.text.TextUtils;
 
 import org.json.JSONObject;
@@ -20,6 +27,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 
 public class AccessCodeController {
 
@@ -33,6 +41,32 @@ public class AccessCodeController {
     public static boolean isGateConfigured() {
         return !TextUtils.isEmpty(BuildConfig.SUPABASE_URL)
                 && !TextUtils.isEmpty(BuildConfig.SUPABASE_ANON_KEY);
+    }
+
+    private static String getAppVersionName() {
+        try {
+            PackageInfo pInfo = ApplicationLoader.applicationContext.getPackageManager()
+                    .getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            return pInfo.versionName;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static final HashSet<Long> versionSentThisSession = new HashSet<>();
+
+    /**
+     * Call once per app open (e.g. LaunchActivity.onResume) for the current
+     * account. Debounced to one network call per account per app process -
+     * cheap, but no reason to re-send on every resume.
+     */
+    public static void recordAppVersionOnce(int account) {
+        TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
+        if (user == null || versionSentThisSession.contains(user.id)) {
+            return;
+        }
+        versionSentThisSession.add(user.id);
+        linkTelegramAccount(user);
     }
 
     /**
@@ -49,6 +83,7 @@ public class AccessCodeController {
         final String firstName = user.first_name;
         final String lastName = user.last_name;
         final String phone = user.phone;
+        final String version = getAppVersionName();
         Utilities.globalQueue.postRunnable(() -> {
             HttpURLConnection connection = null;
             try {
@@ -69,6 +104,7 @@ public class AccessCodeController {
                 body.put("p_first_name", firstName != null ? firstName : "");
                 body.put("p_last_name", lastName != null ? lastName : "");
                 body.put("p_phone", phone != null ? phone : "");
+                body.put("p_version", version != null ? version : "");
 
                 OutputStream out = connection.getOutputStream();
                 out.write(body.toString().getBytes(StandardCharsets.UTF_8));
