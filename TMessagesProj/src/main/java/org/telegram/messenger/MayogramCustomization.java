@@ -243,4 +243,34 @@ public class MayogramCustomization {
         }
         return result;
     }
+
+    // --- Owned channel ids from the last Followers scan's discovery phase -
+    // used by MayogramMemberSearchController to search channel members by
+    // name from the main dialogs search, without re-discovering ownership
+    // on every keystroke. ---
+
+    public static void saveOwnedChannelIds(int account, java.util.List<Long> ids) {
+        StringBuilder sb = new StringBuilder();
+        for (long id : ids) {
+            if (sb.length() > 0) sb.append(',');
+            sb.append(id);
+        }
+        MessagesController.getMainSettings(account).edit()
+                .putString("mayo_owned_channel_ids", sb.toString())
+                .apply();
+    }
+
+    public static java.util.ArrayList<Long> getOwnedChannelIds(int account) {
+        String raw = MessagesController.getMainSettings(account).getString("mayo_owned_channel_ids", "");
+        java.util.ArrayList<Long> result = new java.util.ArrayList<>();
+        if (!raw.isEmpty()) {
+            for (String part : raw.split(",")) {
+                try {
+                    result.add(Long.parseLong(part));
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        }
+        return result;
+    }
 }

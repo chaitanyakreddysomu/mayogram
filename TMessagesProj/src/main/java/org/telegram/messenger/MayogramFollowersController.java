@@ -186,6 +186,13 @@ public class MayogramFollowersController {
 
     private static void finishDiscovery(int account, ArrayList<TLRPC.Chat> ownedChannels) {
         discoveringByAccount.put(account, false);
+
+        ArrayList<Long> ownedIds = new ArrayList<>();
+        for (int a = 0; a < ownedChannels.size(); a++) {
+            ownedIds.add(ownedChannels.get(a).id);
+        }
+        MayogramCustomization.saveOwnedChannelIds(account, ownedIds);
+
         ScanListener listener = listenerByAccount.get(account);
         if (listener != null) {
             int count = ownedChannels.size();

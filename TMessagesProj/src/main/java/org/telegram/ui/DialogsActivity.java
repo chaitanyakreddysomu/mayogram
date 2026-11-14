@@ -8000,6 +8000,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     searchDialogId = dialogId;
                     searchObject = (TLRPC.EncryptedChat) obj;
                 }
+            } else if (obj instanceof org.telegram.messenger.MayogramMemberSearchController.Match) {
+                // Tapping a channel-member search result opens that owned
+                // channel - the point was to find which of your channels
+                // this person joined, not to open their own chat.
+                org.telegram.messenger.MayogramMemberSearchController.Match match = (org.telegram.messenger.MayogramMemberSearchController.Match) obj;
+                dialogId = -match.channel.id;
+                if (!onlySelect) {
+                    searchDialogId = dialogId;
+                    searchObject = match.channel;
+                }
             } else if (obj instanceof MessageObject) {
                 MessageObject messageObject = msg = (MessageObject) obj;
                 dialogId = messageObject.getDialogId();

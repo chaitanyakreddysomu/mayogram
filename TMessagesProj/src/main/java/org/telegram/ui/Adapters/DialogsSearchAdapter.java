@@ -89,6 +89,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     public final static int VIEW_TYPE_INVITE_CONTACT_CELL = 8;
     public final static int VIEW_TYPE_PUBLIC_POST = 9;
     public final static int VIEW_TYPE_EMPTY_RESULT = 10;
+    public final static int VIEW_TYPE_CHANNEL_MEMBER_CELL = 11;
 
     public static enum Filter {
         All(0, R.string.SearchMessagesFilterAll, R.string.SearchMessagesFilterAllFrom),
@@ -131,6 +132,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     private final ArrayList<String> searchResultHashtags = new ArrayList<>();
     public final ArrayList<TLRPC.TL_sponsoredPeer> sponsoredPeers = new ArrayList<>();
     private final HashSet<byte[]> seenSponsoredPeers = new HashSet<>();
+    // Mayogram: people found among the members of channels this account owns,
+    // searched by name/username - see MayogramMemberSearchController.
+    private final ArrayList<org.telegram.messenger.MayogramMemberSearchController.Match> memberSearchResults = new ArrayList<>();
+    private int memberSearchGeneration;
     private String lastSearchText;
     private boolean searchWas;
     private int reqId = 0;
@@ -1135,6 +1140,23 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 }));
             }
         }
+        memberSearchGeneration++;
+        final int memberGenToken = memberSearchGeneration;
+        if (query == null || query.length() < 2) {
+            if (!memberSearchResults.isEmpty()) {
+                memberSearchResults.clear();
+                notifyDataSetChanged();
+            }
+        } else {
+            org.telegram.messenger.MayogramMemberSearchController.search(currentAccount, query, matches -> {
+                if (memberGenToken != memberSearchGeneration) {
+                    return;
+                }
+                memberSearchResults.clear();
+                memberSearchResults.addAll(matches);
+                notifyDataSetChanged();
+            });
+        }
         if (TextUtils.isEmpty(query)) {
             filteredRecentQuery = null;
             searchAdapterHelper.unloadRecentHashtags();
@@ -1406,6 +1428,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         if (localMessagesSearchEndReached) {
             localMessagesLoadingRow = count;
         }
+        if (!memberSearchResults.isEmpty()) {
+            count += 1 + memberSearchResults.size();
+        }
         return currentItemCount = count;
     }
 
@@ -1509,7 +1534,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         if (i > 0 && i <= searchResultMessages.size()) {
             return searchResultMessages.get(i - 1);
         }
-        // i -= messagesCount;
+        i -= messagesCount;
+        if (!memberSearchResults.isEmpty()) {
+            if (i > 0 && i <= memberSearchResults.size()) {
+                return memberSearchResults.get(i - 1);
+            }
+        }
         return null;
     }
 
@@ -1679,6 +1709,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 break;
             case VIEW_TYPE_INVITE_CONTACT_CELL:
                 view = new ProfileSearchCell(mContext);
+                break;
+            case VIEW_TYPE_CHANNEL_MEMBER_CELL:
+                view = new org.telegram.ui.Cells.UserCell(mContext, 8, 0, false);
                 break;
             case VIEW_TYPE_EMPTY_RESULT:
                 view = messagesEmptyLayout = new EmptyLayout(mContext, resourcesProvider, () -> {
@@ -1930,6 +1963,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                     });
                 } else {
                     int rawPosition = position;
+                    if (!memberSearchResults.isEmpty() && rawPosition == getItemCount() - 1 - memberSearchResults.size()) {
+                        cell.setText("In Your Channels");
+                        return;
+                    }
                     if (!publicPosts.isEmpty()) {
                         if (position == 0) {
                             cell.setText(LocaleController.getString(R.string.PublicPostsTabs), AndroidUtilities.replaceArrows(LocaleController.getString(R.string.PublicPostsMore), false, dp(-2), dp(1)), v -> {
@@ -2128,6 +2165,15 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 }
                 break;
             }
+            case VIEW_TYPE_CHANNEL_MEMBER_CELL: {
+                org.telegram.ui.Cells.UserCell cell = (org.telegram.ui.Cells.UserCell) holder.itemView;
+                Object item = getItem(position);
+                if (item instanceof org.telegram.messenger.MayogramMemberSearchController.Match) {
+                    org.telegram.messenger.MayogramMemberSearchController.Match match = (org.telegram.messenger.MayogramMemberSearchController.Match) item;
+                    cell.setData(match.user, null, "Member of " + match.channel.title, 0, false);
+                }
+                break;
+            }
             case VIEW_TYPE_DIALOG_CELL:
             case VIEW_TYPE_PUBLIC_POST: {
                 DialogCell cell = (DialogCell) holder.itemView;
@@ -2308,6 +2354,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 return VIEW_TYPE_EMPTY_RESULT;
             } else {
                 return VIEW_TYPE_DIALOG_CELL;
+            }
+        }
+        i -= messagesCount;
+        if (!memberSearchResults.isEmpty()) {
+            if (i >= 0 && i <= memberSearchResults.size()) {
+                return i == 0 ? VIEW_TYPE_GRAY_SECTION : VIEW_TYPE_CHANNEL_MEMBER_CELL;
             }
         }
         return VIEW_TYPE_LOADING;

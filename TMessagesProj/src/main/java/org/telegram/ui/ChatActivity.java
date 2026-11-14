@@ -582,6 +582,10 @@ public class ChatActivity extends BaseFragment implements
     private ChecksHintView checksHintView;
     private View emojiButtonRed;
     private FrameLayout pinnedMessageView;
+    // Mayogram: shows Telegram's own restriction_reason text (the explanation
+    // it already attaches to a restricted/limited channel) as a banner above
+    // the pinned message bar - see updateMayoRestrictionBanner().
+    private TextView mayoRestrictionBanner;
     private BluredView blurredView;
     private PinnedLineView pinnedLineView;
     private boolean setPinnedTextTranslationX;
@@ -7216,6 +7220,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         pinnedMessageView = null;
+        mayoRestrictionBanner = null;
 
         undoView = null;
         topUndoView = null;
@@ -45613,7 +45618,56 @@ public class ChatActivity extends BaseFragment implements
         return fragmentView.getBottom() - chatListView.getBottom() + ((fragmentTransition == null || (fromPullingDownTransition && !toPullingDownTransition)) && !isInsideContainer ? blurredViewBottomOffset : 0);
     }
 
+    private void createMayoRestrictionBanner() {
+        if (mayoRestrictionBanner != null || getContext() == null || topPanelLayout == null) {
+            return;
+        }
+        mayoRestrictionBanner = new TextView(getContext());
+        mayoRestrictionBanner.setTextColor(0xffffffff);
+        mayoRestrictionBanner.setBackgroundColor(0xffd32f2f);
+        mayoRestrictionBanner.setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 13);
+        mayoRestrictionBanner.setGravity(Gravity.CENTER_VERTICAL);
+        mayoRestrictionBanner.setPadding(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(16), 0);
+        mayoRestrictionBanner.setMaxLines(1);
+        mayoRestrictionBanner.setEllipsize(TextUtils.TruncateAt.END);
+        mayoRestrictionBanner.setVisibility(View.GONE);
+        topPanelLayout.addView(mayoRestrictionBanner, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 40));
+        topPanelLayout.setPriority(mayoRestrictionBanner, 0);
+    }
+
+    // Surfaces chat.restriction_reason - Telegram's own canned explanation
+    // for why it restricted/limited this channel - as a banner above the
+    // pinned message bar. There is no API that reveals who reported the
+    // channel or how many reports it got; only this server-decided outcome,
+    // if any, is ever visible to the channel owner.
+    private void updateMayoRestrictionBanner() {
+        if (getContext() == null || topPanelLayout == null) {
+            return;
+        }
+        if (currentChat == null || !currentChat.restricted || currentChat.restriction_reason.isEmpty()) {
+            if (mayoRestrictionBanner != null) {
+                mayoRestrictionBanner.setVisibility(View.GONE);
+            }
+            return;
+        }
+        createMayoRestrictionBanner();
+        TLRPC.RestrictionReason reasonToShow = null;
+        for (int a = 0; a < currentChat.restriction_reason.size(); a++) {
+            TLRPC.RestrictionReason r = currentChat.restriction_reason.get(a);
+            if (TextUtils.isEmpty(r.platform) || "android".equalsIgnoreCase(r.platform) || "all".equalsIgnoreCase(r.platform)) {
+                reasonToShow = r;
+                break;
+            }
+        }
+        if (reasonToShow == null) {
+            reasonToShow = currentChat.restriction_reason.get(0);
+        }
+        mayoRestrictionBanner.setText("⚠ " + reasonToShow.text);
+        mayoRestrictionBanner.setVisibility(View.VISIBLE);
+    }
+
     private void gotChatInfo() {
+        updateMayoRestrictionBanner();
         if (chatInfo != null && chatInfo.paid_reactions_available) {
             getMessagesController().getPaidReactionsDialogId();
             if (!StarsController.getInstance(currentAccount).balanceAvailable()) {
