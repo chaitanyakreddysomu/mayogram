@@ -110,6 +110,14 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
     public RecyclerListView globalSearchListView;
     public DialogsGlobalAdapter globalSearchAdapter;
 
+    // Mayogram: "Members" tab - people found in the channels you own, see
+    // org.telegram.ui.Adapters.MayogramMemberSearchAdapter.
+    public FrameLayout membersSearchContainer;
+    public StickerEmptyView membersEmptyView;
+    private LinearLayoutManager membersSearchLayoutManager;
+    public RecyclerListView membersSearchListView;
+    public org.telegram.ui.Adapters.MayogramMemberSearchAdapter membersSearchAdapter;
+
     public boolean postsAreNew;
     public final @NonNull PostsSearchContainer postsSearchContainer;
 
@@ -609,6 +617,39 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         });
         globalSearchListView.addEdgeEffectListener(this::invalidateBlur);
 
+        membersSearchContainer = new FrameLayout(context);
+        membersSearchListView = new RecyclerListView(context);
+        membersSearchListView.setPivotY(0);
+        membersSearchListView.setVerticalScrollBarEnabled(true);
+        membersSearchListView.setInstantClick(true);
+        membersSearchListView.setVerticalScrollbarPosition(LocaleController.isRTL ? RecyclerListView.SCROLLBAR_POSITION_LEFT : RecyclerListView.SCROLLBAR_POSITION_RIGHT);
+        membersSearchListView.setLayoutManager(membersSearchLayoutManager = new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
+        membersSearchListView.setAnimateEmptyView(true, RecyclerListView.EMPTY_VIEW_ANIMATION_TYPE_ALPHA);
+        membersSearchListView.setClipToPadding(false);
+
+        loadingView = new FlickerLoadingView(context);
+        loadingView.setViewType(1);
+        membersEmptyView = new StickerEmptyView(context, loadingView, StickerEmptyView.STICKER_TYPE_SEARCH) {
+            @Override
+            public void setVisibility(int visibility) {
+                if (noMediaFiltersSearchView.getTag() != null) {
+                    super.setVisibility(View.GONE);
+                    return;
+                }
+                super.setVisibility(visibility);
+            }
+        };
+        membersEmptyView.title.setText(getString(R.string.NoResult));
+        membersEmptyView.subtitle.setVisibility(View.GONE);
+        membersEmptyView.setVisibility(View.GONE);
+        membersEmptyView.addView(loadingView, 0);
+        membersSearchContainer.addView(membersEmptyView);
+        membersSearchContainer.addView(membersSearchListView);
+        membersSearchListView.setEmptyView(membersEmptyView);
+        membersSearchAdapter = new org.telegram.ui.Adapters.MayogramMemberSearchAdapter(context, currentAccount);
+        membersSearchListView.setAdapter(membersSearchAdapter);
+        membersSearchListView.addEdgeEffectListener(this::invalidateBlur);
+
         hashtagSearchContainer = new FrameLayout(context);
 
         hashtagItemAnimator = new DefaultItemAnimator() {
@@ -794,6 +835,9 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         if (view == globalSearchContainer) {
             globalSearchAdapter.search(query);
             globalEmptyView.setKeyboardHeight(keyboardSize, false);
+        } else if (view == membersSearchContainer) {
+            membersSearchAdapter.search(query);
+            membersEmptyView.setKeyboardHeight(keyboardSize, false);
         } else if (view == channelsSearchContainer) {
             MessagesController.getInstance(currentAccount).getChannelRecommendations(0);
             channelsSearchAdapter.search(query);
@@ -1371,6 +1415,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         }
 
         setPagesPaddings(globalSearchContainer, globalSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
+        setPagesPaddings(membersSearchContainer, membersSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         setPagesPaddings(channelsSearchContainer, channelsSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         setPagesPaddings(botsSearchContainer, botsSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
         setPagesPaddings(hashtagSearchContainer, hashtagSearchListView, pagesPaddingTop, pagesPaddingBottom, doNotRequestLayout);
@@ -1416,6 +1461,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 channelsEmptyView.setKeyboardHeight(keyboardSize, animated);
             } else if (getChildAt(i) == globalSearchContainer) {
                 globalEmptyView.setKeyboardHeight(keyboardSize, animated);
+            } else if (getChildAt(i) == membersSearchContainer) {
+                membersEmptyView.setKeyboardHeight(keyboardSize, animated);
             }
         }
     }
@@ -1576,6 +1623,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             return searchListView;
         } else if (page == globalSearchContainer) {
             return globalSearchListView;
+        } else if (page == membersSearchContainer) {
+            return membersSearchListView;
         } else if (page == channelsSearchContainer) {
             return channelsSearchListView;
         } else if (page == botsSearchContainer) {
@@ -1623,6 +1672,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
         private final static int PUBLIC_POSTS_TYPE = 5;
         private final static int POSTS_TYPE = 6;
         private final static int GLOBAL_TYPE = 7;
+        private final static int MEMBERS_TYPE = 8;
 
         public ViewPagerAdapter() {
             updateItems();
@@ -1635,6 +1685,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 return;
             }
             items.add(new Item(GLOBAL_TYPE));
+            items.add(new Item(MEMBERS_TYPE));
 
             if (expandedPublicPosts) {
                 items.add(new Item(PUBLIC_POSTS_TYPE));
@@ -1680,6 +1731,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 }
             } else if (items.get(position).type == GLOBAL_TYPE) {
                 return getString(R.string.GlobalSearch);
+            } else if (items.get(position).type == MEMBERS_TYPE) {
+                return "Members";
             } else if (items.get(position).type == DOWNLOADS_TYPE) {
                 return getString(R.string.DownloadsTabs);
             } else if (items.get(position).type == PUBLIC_POSTS_TYPE) {
@@ -1722,6 +1775,8 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 return postsSearchContainer;
             } else if (viewType == 7) {
                 return globalSearchContainer;
+            } else if (viewType == 8) {
+                return membersSearchContainer;
             } else {
                 FilteredSearchView filteredSearchView = new FilteredSearchView(parent);
                 filteredSearchView.setChatPreviewDelegate(chatPreviewDelegate);
@@ -1765,6 +1820,9 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
             }
             if (items.get(position).type == GLOBAL_TYPE) {
                 return 7;
+            }
+            if (items.get(position).type == MEMBERS_TYPE) {
+                return 8;
             }
             return items.get(position).type + position;
         }
