@@ -1,24 +1,40 @@
 /*
  * Mayogram: "Get Channel IDs" row in Settings -> Mayogram, below Followers.
- * Lists every channel/group the account is in, searchable by title, with a
- * checkbox per row. Tapping Export (top right) writes a CSV of whatever is
- * selected - no, channel_name, channel_id - and opens the share sheet. If
- * nothing is selected, exports the full (filtered) list instead.
+ * Lists every channel/group the account is in - avatar on the left, name,
+ * a square tick mark at the right end of each row. Selected chats also show
+ * as a horizontal strip of avatars above the list (tap one there to
+ * deselect). The bottom-right floating button exports whatever's selected
+ * (or the whole filtered list if nothing's checked) as a CSV
+ * (no, channel_name, channel_id) and opens the share sheet.
  */
 package org.telegram.ui;
 
+import static org.telegram.messenger.AndroidUtilities.dp;
+
 import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import org.telegram.messenger.ChatObject;
+import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.MayogramExportController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
+import org.telegram.ui.Cells.UserCell;
+import org.telegram.ui.Components.AvatarDrawable;
+import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.BulletinFactory;
+import org.telegram.ui.Components.FragmentFloatingButton;
+import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalFragment;
@@ -30,11 +46,10 @@ import java.util.Locale;
 
 public class MayogramChannelIdsActivity extends UniversalFragment {
 
-    private static final int BUTTON_EXPORT = 1;
-
+    private final LinkedHashSet<Long> selectedChatIds = new LinkedHashSet<>();
     private String query = "";
-    private final LinkedHashSet<Long> selectedIds = new LinkedHashSet<>();
     private boolean exporting;
+    private FragmentFloatingButton floatingButton;
 
     @Override
     protected CharSequence getTitle() {
@@ -49,12 +64,9 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
-                } else if (id == BUTTON_EXPORT) {
-                    startExport();
                 }
             }
         });
-        actionBar.createMenu().addItem(BUTTON_EXPORT, exporting ? "Exporting..." : "Export");
         ActionBarMenuItem searchItem = actionBar.createMenu().addItem(0, R.drawable.outline_header_search, getResourceProvider());
         searchItem.setIsSearchField(true);
         searchItem.setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
@@ -74,6 +86,13 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
                 }
             }
         });
+        if (view instanceof FrameLayout) {
+            floatingButton = new FragmentFloatingButton(context, getResourceProvider());
+            floatingButton.setImageResource(R.drawable.floating_check);
+            floatingButton.setContentDescription("Export");
+            floatingButton.setOnClickListener(v -> startExport());
+            ((FrameLayout) view).addView(floatingButton, FragmentFloatingButton.createDefaultLayoutParams());
+        }
         return view;
     }
 
@@ -81,9 +100,13 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         List<TLRPC.Chat> chats = collectChats();
 
-        items.add(UItem.asShadow(selectedIds.isEmpty()
+        if (!selectedChatIds.isEmpty()) {
+            items.add(UItem.asCustom(buildSelectedStrip(getContext(), chats)));
+        }
+
+        items.add(UItem.asShadow(selectedChatIds.isEmpty()
                 ? "Select channels/groups below, or leave nothing selected to export the whole list."
-                : selectedIds.size() + " selected."));
+                : selectedChatIds.size() + " selected."));
 
         String q = query.trim().toLowerCase(Locale.getDefault());
         int shown = 0;
@@ -93,13 +116,68 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
                 continue;
             }
             shown++;
-            UItem item = UItem.asCheck((int) chat.id, chat.title);
-            item.object = chat;
-            item.checked = selectedIds.contains(chat.id);
-            items.add(item);
+            items.add(UItem.asCustom(buildChatRow(getContext(), chat)));
         }
         if (shown == 0) {
             items.add(UItem.asShadow(q.isEmpty() ? "No channels or groups found." : "No matches for \"" + query.trim() + "\"."));
+        }
+    }
+
+    private View buildChatRow(Context context, TLRPC.Chat chat) {
+        UserCell cell = new UserCell(context, 16, 2, false);
+        cell.setData(chat, null, null, 0, false);
+        cell.setChecked(selectedChatIds.contains(chat.id), false);
+        cell.setOnClickListener(v -> toggleSelection(chat));
+        return cell;
+    }
+
+    private View buildSelectedStrip(Context context, List<TLRPC.Chat> chats) {
+        HorizontalScrollView scrollView = new HorizontalScrollView(context);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        for (int i = 0; i < chats.size(); i++) {
+            TLRPC.Chat chat = chats.get(i);
+            if (!selectedChatIds.contains(chat.id)) {
+                continue;
+            }
+            row.addView(buildAvatarChip(context, chat), LayoutHelper.createLinear(52, 52, 0, 0, 0, 10, 0));
+        }
+        scrollView.addView(row, LayoutHelper.createScroll(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
+        return scrollView;
+    }
+
+    private View buildAvatarChip(Context context, TLRPC.Chat chat) {
+        FrameLayout chip = new FrameLayout(context);
+
+        BackupImageView avatarView = new BackupImageView(context);
+        avatarView.setRoundRadius(dp(22));
+        AvatarDrawable avatarDrawable = new AvatarDrawable();
+        avatarDrawable.setInfo(chat);
+        avatarView.setImage(ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_SMALL), "50_50", avatarDrawable, chat);
+        chip.addView(avatarView, LayoutHelper.createFrame(44, 44, Gravity.TOP | Gravity.LEFT));
+
+        ImageView removeBadge = new ImageView(context);
+        removeBadge.setImageResource(R.drawable.msg_close);
+        removeBadge.setColorFilter(0xffffffff);
+        removeBadge.setPadding(dp(3), dp(3), dp(3), dp(3));
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setShape(GradientDrawable.OVAL);
+        badgeBg.setColor(0xff8a8a8a);
+        removeBadge.setBackground(badgeBg);
+        chip.addView(removeBadge, LayoutHelper.createFrame(16, 16, Gravity.TOP | Gravity.RIGHT));
+
+        chip.setOnClickListener(v -> toggleSelection(chat));
+        return chip;
+    }
+
+    private void toggleSelection(TLRPC.Chat chat) {
+        if (!selectedChatIds.remove(chat.id)) {
+            selectedChatIds.add(chat.id);
+        }
+        if (listView != null) {
+            listView.adapter.update(true);
         }
     }
 
@@ -121,30 +199,17 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
         return chats;
     }
 
-    @Override
-    protected void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.object instanceof TLRPC.Chat) {
-            long id = ((TLRPC.Chat) item.object).id;
-            if (!selectedIds.remove(id)) {
-                selectedIds.add(id);
-            }
-            if (listView != null) {
-                listView.adapter.update(true);
-            }
-        }
-    }
-
     private void startExport() {
         if (exporting) {
             return;
         }
         List<TLRPC.Chat> chats = collectChats();
         List<TLRPC.Chat> toExport = new ArrayList<>();
-        if (selectedIds.isEmpty()) {
+        if (selectedChatIds.isEmpty()) {
             toExport.addAll(chats);
         } else {
             for (TLRPC.Chat chat : chats) {
-                if (selectedIds.contains(chat.id)) {
+                if (selectedChatIds.contains(chat.id)) {
                     toExport.add(chat);
                 }
             }
@@ -156,25 +221,16 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
             return;
         }
         exporting = true;
-        if (listView != null) {
-            listView.adapter.update(true);
-        }
         MayogramExportController.exportChatsToCsv(toExport, new MayogramExportController.ExportCallback() {
             @Override
             public void onDone(java.io.File csvFile) {
                 exporting = false;
-                if (listView != null) {
-                    listView.adapter.update(true);
-                }
                 shareCsv(csvFile);
             }
 
             @Override
             public void onError() {
                 exporting = false;
-                if (listView != null) {
-                    listView.adapter.update(true);
-                }
                 if (getParentActivity() != null) {
                     BulletinFactory.of(MayogramChannelIdsActivity.this).createSimpleBulletin(R.drawable.msg_retry, "Export failed.").show();
                 }
@@ -204,5 +260,9 @@ public class MayogramChannelIdsActivity extends UniversalFragment {
     @Override
     protected boolean onLongClick(UItem item, View view, int position, float x, float y) {
         return false;
+    }
+
+    @Override
+    protected void onClick(UItem item, View view, int position, float x, float y) {
     }
 }
