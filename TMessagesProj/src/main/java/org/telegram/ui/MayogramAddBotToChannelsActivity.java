@@ -265,6 +265,25 @@ public class MayogramAddBotToChannelsActivity extends UniversalFragment {
         }
         TLRPC.Chat chat = targets.get(index);
         boolean isChannel = ChatObject.isChannel(chat);
+        boolean isBroadcastChannel = isChannel && !chat.megagroup;
+
+        if (isBroadcastChannel) {
+            // Telegram has no concept of a plain, non-admin bot in a
+            // broadcast channel - channels.inviteToChannel rejects a bot
+            // with USER_BOT every time. A bot can only ever be added to a
+            // channel by promoting it directly via channels.editAdmin,
+            // which adds it as a participant as a side effect. "Member" here
+            // is the closest real equivalent: promote with every right off.
+            TLRPC.TL_chatAdminRights rights = ChatRightsEditActivity.emptyAdminRights(asAdmin);
+            getMessagesController().setUserAdminRole(chat.id, bot, rights, null, true, this, true, false, null,
+                    () -> addNext(targets, index + 1, bot, asAdmin, successCount + 1, failCount),
+                    error -> {
+                        addNext(targets, index + 1, bot, asAdmin, successCount, failCount + 1);
+                        return true;
+                    });
+            return;
+        }
+
         getMessagesController().addUserToChat(chat.id, bot, 0, null, this, true, () -> {
             if (asAdmin) {
                 getMessagesController().setUserAdminRole(chat.id, bot, ChatRightsEditActivity.emptyAdminRights(true), null, isChannel, this, true, false, null,
