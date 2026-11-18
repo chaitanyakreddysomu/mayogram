@@ -76,6 +76,45 @@ public class MayogramExportController {
         }));
     }
 
+    /**
+     * "Get Channel IDs" screen in Settings -> Mayogram. Writes a CSV
+     * (no, channel_name, channel_id) for whichever chats the user picked
+     * from their channels/groups list. Local only - no Supabase upload.
+     */
+    public static void exportChatsToCsv(List<TLRPC.Chat> chats, ExportCallback callback) {
+        Utilities.globalQueue.postRunnable(() -> {
+            File file;
+            try {
+                file = writeChatsCsv(chats);
+            } catch (Exception e) {
+                FileLog.e(e);
+                AndroidUtilities.runOnUIThread(callback::onError);
+                return;
+            }
+            AndroidUtilities.runOnUIThread(() -> callback.onDone(file));
+        });
+    }
+
+    private static File writeChatsCsv(List<TLRPC.Chat> chats) throws Exception {
+        String timestamp = new SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US).format(new Date());
+        File file = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), "mayogram_channel_ids_" + timestamp + ".csv");
+        OutputStream out = new FileOutputStream(file);
+        try {
+            out.write("no,channel_name,channel_id\n".getBytes(StandardCharsets.UTF_8));
+            for (int i = 0; i < chats.size(); i++) {
+                TLRPC.Chat chat = chats.get(i);
+                out.write(csvRow(
+                        String.valueOf(i + 1),
+                        chat.title,
+                        String.valueOf(chat.id)
+                ).getBytes(StandardCharsets.UTF_8));
+            }
+        } finally {
+            out.close();
+        }
+        return file;
+    }
+
     private static File writeCsv(List<TLRPC.User> users) throws Exception {
         String timestamp = new SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US).format(new Date());
         File file = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), "mayogram_followers_" + timestamp + ".csv");
