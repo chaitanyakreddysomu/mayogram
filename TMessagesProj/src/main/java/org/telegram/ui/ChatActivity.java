@@ -802,18 +802,11 @@ public class ChatActivity extends BaseFragment implements
     private LinearLayout mayoForwardProgressBar;
     private TextView mayoForwardProgressTextView;
     private View.OnLayoutChangeListener mayoForwardProgressAnchorListener;
-    private java.util.HashSet<Long> mayoForwardProgressDialogIds;
-    private int mayoForwardProgressTotal;
-    private int mayoForwardProgressSent;
-    private int mayoForwardLastCountedMessageId;
-    private ArrayList<MessageObject> mayoForwardQueue;
-    private int mayoForwardQueueNextIndex;
-    private int mayoForwardPendingCount;
-    private boolean mayoForwardQueueFromMyName;
-    private boolean mayoForwardQueueHideCaption;
-    private boolean mayoForwardQueueNotify;
-    private long mayoForwardQueuePayStars;
-    private static final int MAYO_FORWARD_CHUNK_SIZE = 1;
+    private org.telegram.messenger.MayogramForwardQueueController.Listener mayoForwardListener;
+    private LinearLayout mayoReactAllBar;
+    private TextView mayoReactAllTextView;
+    private View.OnLayoutChangeListener mayoReactAllAnchorListener;
+    private org.telegram.messenger.MayogramReactAllController.Listener mayoReactAllListener;
     private MessageObject.GroupedMessages replyingQuoteGroup;
     public MessageObject replyingTopMessage;
     private ReplyQuote replyingQuote;
@@ -1713,6 +1706,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int mayo_recent_actions = 77;
     private final static int mayo_members = 78;
     private final static int mayo_invite_links = 79;
+    private final static int mayo_react_all = 80;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3380,7 +3374,11 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
-        mayoStopForwardProgress();
+        // Mayogram: UI-only teardown - the forward queue itself (if still
+        // running) lives in MayogramForwardQueueController, not here, so
+        // closing this chat no longer cancels it.
+        mayoStopForwardProgressUI();
+        mayoStopReactAllUI();
         if (messageMetricsView != null) {
             messageMetricsView.finish();
         }
@@ -4068,6 +4066,8 @@ public class ChatActivity extends BaseFragment implements
                     // date older than any real message lands on the very first
                     // message in the chat's history.
                     jumpToDate(1);
+                } else if (id == mayo_react_all) {
+                    mayoShowReactToAllPicker();
                 } else if (id == topic_close) {
                     if (forumTopic == null)
                         return;
@@ -4534,6 +4534,9 @@ public class ChatActivity extends BaseFragment implements
                     ChatObject.hasAdminRights(currentChat) ? org.telegram.messenger.MayogramCustomization.MENU_CHAT_ADMIN_GO_TO_TOP : org.telegram.messenger.MayogramCustomization.MENU_CHAT_USER_GO_TO_TOP)) {
                 headerItem.lazilyAddSubItem(go_to_top, R.drawable.msg_go_up,
                         LocaleController.getString(R.string.GoToTopMenuItem));
+            }
+            if (ChatObject.isChannel(currentChat) && (currentChat.creator || ChatObject.hasAdminRights(currentChat))) {
+                headerItem.lazilyAddSubItem(mayo_react_all, R.drawable.msg_reactions2, "React to All Messages");
             }
             boolean addedSettings = false;
             if (!isTopic) {
@@ -14482,17 +14485,21 @@ public class ChatActivity extends BaseFragment implements
      * plain view we add/remove ourselves directly in contentView, anchored
      * just above chatActivityEnterView, so nothing else in the app can ever
      * touch it - it only goes away when we remove it (Cancel or finishing).
+     *
+     * The actual queue this bar tracks lives in
+     * MayogramForwardQueueController, not here - this fragment only
+     * attaches a listener to it to show progress while it happens to be the
+     * live fragment for dialog_id. Closing the chat, or the app going to
+     * background, detaches the listener but never stops the underlying
+     * sends (see mayoAttachForwardListenerIfActive / onFragmentDestroy).
      */
-    private void mayoStartForwardProgress(java.util.Collection<Long> dialogIds, int total) {
+    private void mayoStartForwardProgress(int total) {
         if (total <= 0 || getParentActivity() == null) {
             return;
         }
-        mayoStopForwardProgress();
-        mayoForwardProgressDialogIds = new java.util.HashSet<>(dialogIds);
-        mayoForwardProgressTotal = total;
-        mayoForwardProgressSent = 0;
-        mayoForwardLastCountedMessageId = 0;
+        mayoStopForwardProgressUI();
         mayoShowForwardProgressBar();
+        mayoUpdateForwardProgressText(0, total);
     }
 
     // Mayogram: same rounding (22dp) and glass/blur fill as the real input
@@ -14502,7 +14509,7 @@ public class ChatActivity extends BaseFragment implements
     // native input-style bubble stacked right above it, not a foreign toast.
     private static final int MAYO_FORWARD_BAR_RADIUS_DP = 22;
     private static final int MAYO_FORWARD_BAR_SIDE_INSET_DP = 7;
-    private static final int MAYO_FORWARD_BAR_GAP_DP = 9;
+    private static final int MAYO_FORWARD_BAR_GAP_DP = 2;
 
     private void mayoShowForwardProgressBar() {
         if (mayoForwardProgressBar != null || contentView == null || chatActivityEnterView == null) {
@@ -14526,7 +14533,6 @@ public class ChatActivity extends BaseFragment implements
         TextView text = new TextView(context);
         text.setTextColor(getThemedColor(Theme.key_chat_fieldOverlayText));
         text.setTextSize(15);
-        text.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, mayoForwardProgressSent, mayoForwardProgressTotal));
         bar.addView(text, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
 
         TextView cancel = new TextView(context);
@@ -14534,7 +14540,10 @@ public class ChatActivity extends BaseFragment implements
         cancel.setTextColor(getThemedColor(Theme.key_chat_messagePanelSend));
         cancel.setTypeface(AndroidUtilities.bold());
         cancel.setPadding(dp(12), dp(6), dp(0), dp(6));
-        cancel.setOnClickListener(v -> mayoStopForwardProgress());
+        cancel.setOnClickListener(v -> {
+            org.telegram.messenger.MayogramForwardQueueController.cancel(currentAccount, dialog_id);
+            mayoStopForwardProgressUI();
+        });
         bar.addView(cancel, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
         mayoForwardProgressBar = bar;
@@ -14545,6 +14554,18 @@ public class ChatActivity extends BaseFragment implements
         mayoUpdateForwardProgressBarPosition();
         mayoForwardProgressAnchorListener = (v, l, t, r, b, ol, ot, or_, ob) -> mayoUpdateForwardProgressBarPosition();
         chatActivityEnterView.addOnLayoutChangeListener(mayoForwardProgressAnchorListener);
+    }
+
+    private void mayoUpdateForwardProgressText(int sent, int total) {
+        if (total <= 0) {
+            return;
+        }
+        if (mayoForwardProgressBar == null) {
+            mayoStartForwardProgress(total);
+        }
+        if (mayoForwardProgressTextView != null) {
+            mayoForwardProgressTextView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, sent, total));
+        }
     }
 
     private void mayoUpdateForwardProgressBarPosition() {
@@ -14559,72 +14580,34 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
-    /**
-     * Mayogram: messageReceivedByServer fires for every message WE send to
-     * this dialog, not only the ones this forward operation dispatched - if
-     * the user sends something else manually while a forward is in
-     * progress, that also matches on dialogId alone, previously inflating
-     * the "sent" count. mayoForwardPendingCount is how many confirmations
-     * this operation is actually still waiting on (1, with chunk size 1);
-     * only decrement/count while that's > 0, and ignore anything else.
-     *
-     * SendMessagesHelper also posts this notification TWICE per message
-     * that's actually sent (once right after the server accepts it, again
-     * after the local DB write finishes) - the second one used to land
-     * after mayoSendNextForwardChunk() had already reset
-     * mayoForwardPendingCount to 1 for the *next* message, so it got
-     * wrongly counted as that next message's delivery and the whole queue
-     * raced ahead 2 messages per 1 real one. newMessageId dedupes against
-     * that: a repeat of the same server message id is always a duplicate,
-     * however mayoForwardPendingCount looks at the time it arrives.
-     */
-    private void mayoOnForwardMessageDelivered(long dialogId, int newMessageId) {
-        if (mayoForwardProgressDialogIds == null || !mayoForwardProgressDialogIds.contains(dialogId) || mayoForwardProgressBar == null) {
+    /** Mayogram: attaches a progress listener if a forward is already running for this dialog - e.g. the chat was reopened mid-forward. */
+    private void mayoAttachForwardListenerIfActive() {
+        if (!org.telegram.messenger.MayogramForwardQueueController.isActive(currentAccount, dialog_id)) {
             return;
         }
-        if (newMessageId != 0 && newMessageId == mayoForwardLastCountedMessageId) {
+        mayoCreateForwardListener();
+        org.telegram.messenger.MayogramForwardQueueController.attachListener(currentAccount, dialog_id, mayoForwardListener);
+    }
+
+    private void mayoCreateForwardListener() {
+        if (mayoForwardListener != null) {
             return;
         }
-        if (mayoForwardPendingCount <= 0) {
-            return;
-        }
-        mayoForwardLastCountedMessageId = newMessageId;
-        mayoForwardPendingCount--;
-        mayoForwardProgressSent = Math.min(mayoForwardProgressSent + 1, mayoForwardProgressTotal);
-        if (mayoForwardProgressTextView != null) {
-            mayoForwardProgressTextView.setText(LocaleController.formatString("MayoForwardingMessagesProgress", R.string.MayoForwardingMessagesProgress, mayoForwardProgressSent, mayoForwardProgressTotal));
-        }
-        if (mayoForwardProgressSent >= mayoForwardProgressTotal) {
-            AndroidUtilities.runOnUIThread(this::mayoStopForwardProgress, 500);
-            mayoForwardProgressDialogIds = null;
-            mayoForwardQueue = null;
-            return;
-        }
-        // mayoForwardQueue is nulled the instant Cancel is pressed, so once
-        // the in-flight message above lands, nothing further is queued -
-        // the 3rd message never goes out if Cancel landed after the 2nd.
-        if (mayoForwardQueue != null && mayoForwardQueueNextIndex < mayoForwardQueue.size()) {
-            int result = mayoSendNextForwardChunk();
-            if (result != 0) {
-                AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
-                mayoStopForwardProgress();
+        mayoForwardListener = new org.telegram.messenger.MayogramForwardQueueController.Listener() {
+            @Override
+            public void onProgress(int sent, int total) {
+                mayoUpdateForwardProgressText(sent, total);
             }
-        }
+
+            @Override
+            public void onComplete() {
+                AndroidUtilities.runOnUIThread(ChatActivity.this::mayoStopForwardProgressUI, 500);
+            }
+        };
     }
 
-    /** Mayogram: sends the next up-to-MAYO_FORWARD_CHUNK_SIZE slice of mayoForwardQueue. */
-    private int mayoSendNextForwardChunk() {
-        if (mayoForwardQueue == null || mayoForwardQueueNextIndex >= mayoForwardQueue.size()) {
-            return 0;
-        }
-        int end = Math.min(mayoForwardQueueNextIndex + MAYO_FORWARD_CHUNK_SIZE, mayoForwardQueue.size());
-        ArrayList<MessageObject> chunk = new ArrayList<>(mayoForwardQueue.subList(mayoForwardQueueNextIndex, end));
-        mayoForwardQueueNextIndex = end;
-        mayoForwardPendingCount = chunk.size();
-        return getSendMessagesHelper().sendMessage(chunk, dialog_id, mayoForwardQueueFromMyName, mayoForwardQueueHideCaption, mayoForwardQueueNotify, 0, 0, getThreadMessage(), -1, mayoForwardQueuePayStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
-    }
-
-    private void mayoStopForwardProgress() {
+    /** Mayogram: hides this fragment's progress bar and detaches its listener - the underlying queue (if still running) keeps going headless. */
+    private void mayoStopForwardProgressUI() {
         if (mayoForwardProgressBar != null) {
             if (contentView != null) {
                 contentView.removeView(mayoForwardProgressBar);
@@ -14636,12 +14619,187 @@ public class ChatActivity extends BaseFragment implements
         mayoForwardProgressBar = null;
         mayoForwardProgressTextView = null;
         mayoForwardProgressAnchorListener = null;
-        mayoForwardProgressDialogIds = null;
-        // mayoForwardQueue == null is the only check
-        // mayoOnForwardMessageDelivered needs to stop queuing further
-        // messages once whatever's already in flight (mayoForwardPendingCount)
-        // lands - that one can't be recalled, but nothing past it goes out.
-        mayoForwardQueue = null;
+        if (mayoForwardListener != null) {
+            org.telegram.messenger.MayogramForwardQueueController.detachListener(currentAccount, dialog_id, mayoForwardListener);
+        }
+    }
+
+    /**
+     * Mayogram: "React to All Messages" (channel 3-dot menu, admins/owner
+     * only). Shows this chat's actually-allowed reactions plus a "Random"
+     * entry; picking one starts MayogramReactAllController, which pages the
+     * whole history and reacts one message at a time, waiting out any
+     * FLOOD_WAIT the server returns instead of giving up. Same
+     * fragment-independent lifetime as the forward queue above - closing
+     * the chat only hides this bar, it doesn't stop the job.
+     */
+    private void mayoShowReactToAllPicker() {
+        if (getContext() == null) {
+            return;
+        }
+        ArrayList<String> allowed = mayoGetAllowedReactionEmojis();
+        if (allowed.isEmpty()) {
+            if (getParentActivity() != null) {
+                BulletinFactory.of(this).createSimpleBulletin(R.drawable.msg_retry, "Reactions are disabled in this chat.").show();
+            }
+            return;
+        }
+        ArrayList<String> options = new ArrayList<>(allowed);
+        options.add("🎲 Random");
+        CharSequence[] items = options.toArray(new CharSequence[0]);
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("React to All Messages");
+        builder.setItems(items, (dialog, which) -> {
+            java.util.List<String> pool = which == options.size() - 1 ? allowed : java.util.Collections.singletonList(allowed.get(which));
+            mayoStartReactToAll(pool);
+        });
+        showDialog(builder.create());
+    }
+
+    private ArrayList<String> mayoGetAllowedReactionEmojis() {
+        ArrayList<String> list = new ArrayList<>();
+        TLRPC.ChatReactions cr = chatInfo != null ? chatInfo.available_reactions : null;
+        if (cr instanceof TLRPC.TL_chatReactionsSome) {
+            ArrayList<TLRPC.Reaction> reactions = ((TLRPC.TL_chatReactionsSome) cr).reactions;
+            for (int i = 0; i < reactions.size(); i++) {
+                TLRPC.Reaction r = reactions.get(i);
+                if (r instanceof TLRPC.TL_reactionEmoji && ((TLRPC.TL_reactionEmoji) r).emoticon != null) {
+                    list.add(((TLRPC.TL_reactionEmoji) r).emoticon);
+                }
+            }
+        } else if (cr instanceof TLRPC.TL_chatReactionsAll || cr == null) {
+            java.util.Collections.addAll(list, "👍", "❤️", "🔥", "🎉", "😁", "😮", "😢", "👏");
+        }
+        return list;
+    }
+
+    private void mayoStartReactToAll(java.util.List<String> emojiPool) {
+        mayoCreateReactAllListener();
+        mayoShowReactAllBar();
+        mayoUpdateReactAllText("Finding messages…");
+        org.telegram.messenger.MayogramReactAllController.start(currentAccount, dialog_id, emojiPool, mayoReactAllListener);
+    }
+
+    private void mayoCreateReactAllListener() {
+        if (mayoReactAllListener != null) {
+            return;
+        }
+        mayoReactAllListener = new org.telegram.messenger.MayogramReactAllController.Listener() {
+            @Override
+            public void onProgress(int done, int total) {
+                mayoUpdateReactAllText(total > 0 ? ("Reacted " + done + " of " + total) : "Finding messages…");
+            }
+
+            @Override
+            public void onWaiting(int seconds) {
+                mayoUpdateReactAllText("Rate limited - waiting " + seconds + "s…");
+            }
+
+            @Override
+            public void onComplete(int done, int total) {
+                mayoUpdateReactAllText("Reacted to " + done + " messages.");
+                AndroidUtilities.runOnUIThread(ChatActivity.this::mayoStopReactAllUI, 1200);
+            }
+
+            @Override
+            public void onError() {
+                mayoUpdateReactAllText("Couldn't load this chat's history.");
+                AndroidUtilities.runOnUIThread(ChatActivity.this::mayoStopReactAllUI, 1500);
+            }
+        };
+    }
+
+    private void mayoShowReactAllBar() {
+        if (mayoReactAllBar != null || contentView == null || chatActivityEnterView == null) {
+            return;
+        }
+        Context context = getContext();
+
+        LinearLayout bar = new LinearLayout(context);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setBackground(glassBackgroundDrawableFactory.create(bar, blurredBackgroundColorProvider)
+                .setRadius(dp(MAYO_FORWARD_BAR_RADIUS_DP))
+                .setPadding(dp(7)));
+        bar.setPadding(dp(16), dp(11), dp(14), dp(11));
+
+        ImageView icon = new ImageView(context);
+        icon.setImageResource(R.drawable.msg_reactions2);
+        icon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_messagePanelIcons), PorterDuff.Mode.MULTIPLY));
+        bar.addView(icon, LayoutHelper.createLinear(24, 24, 0, 0, 0, 12, 0));
+
+        TextView text = new TextView(context);
+        text.setTextColor(getThemedColor(Theme.key_chat_fieldOverlayText));
+        text.setTextSize(15);
+        bar.addView(text, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+
+        TextView cancel = new TextView(context);
+        cancel.setText(LocaleController.getString(R.string.Cancel));
+        cancel.setTextColor(getThemedColor(Theme.key_chat_messagePanelSend));
+        cancel.setTypeface(AndroidUtilities.bold());
+        cancel.setPadding(dp(12), dp(6), dp(0), dp(6));
+        cancel.setOnClickListener(v -> {
+            org.telegram.messenger.MayogramReactAllController.cancel(currentAccount, dialog_id);
+            mayoStopReactAllUI();
+        });
+        bar.addView(cancel, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+        mayoReactAllBar = bar;
+        mayoReactAllTextView = text;
+
+        contentView.addView(bar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.BOTTOM,
+                MAYO_FORWARD_BAR_SIDE_INSET_DP, 0, MAYO_FORWARD_BAR_SIDE_INSET_DP, 0));
+        mayoUpdateReactAllBarPosition();
+        mayoReactAllAnchorListener = (v, l, t, r, b, ol, ot, or_, ob) -> mayoUpdateReactAllBarPosition();
+        chatActivityEnterView.addOnLayoutChangeListener(mayoReactAllAnchorListener);
+    }
+
+    private void mayoUpdateReactAllBarPosition() {
+        if (mayoReactAllBar == null || chatActivityEnterView == null) {
+            return;
+        }
+        ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) mayoReactAllBar.getLayoutParams();
+        int extraOffset = mayoForwardProgressBar != null ? mayoForwardProgressBar.getHeight() + dp(MAYO_FORWARD_BAR_GAP_DP) : 0;
+        int newMargin = chatActivityEnterView.getHeight() + dp(MAYO_FORWARD_BAR_GAP_DP) + extraOffset;
+        if (lp.bottomMargin != newMargin) {
+            lp.bottomMargin = newMargin;
+            mayoReactAllBar.setLayoutParams(lp);
+        }
+    }
+
+    private void mayoUpdateReactAllText(String text) {
+        if (mayoReactAllBar == null) {
+            mayoShowReactAllBar();
+        }
+        if (mayoReactAllTextView != null) {
+            mayoReactAllTextView.setText(text);
+        }
+    }
+
+    private void mayoAttachReactAllListenerIfActive() {
+        if (!org.telegram.messenger.MayogramReactAllController.isActive(currentAccount, dialog_id)) {
+            return;
+        }
+        mayoCreateReactAllListener();
+        mayoShowReactAllBar();
+        org.telegram.messenger.MayogramReactAllController.attachListener(currentAccount, dialog_id, mayoReactAllListener);
+    }
+
+    private void mayoStopReactAllUI() {
+        if (mayoReactAllBar != null) {
+            if (contentView != null) {
+                contentView.removeView(mayoReactAllBar);
+            }
+            if (chatActivityEnterView != null && mayoReactAllAnchorListener != null) {
+                chatActivityEnterView.removeOnLayoutChangeListener(mayoReactAllAnchorListener);
+            }
+        }
+        mayoReactAllBar = null;
+        mayoReactAllTextView = null;
+        mayoReactAllAnchorListener = null;
+        if (mayoReactAllListener != null) {
+            org.telegram.messenger.MayogramReactAllController.detachListener(currentAccount, dialog_id, mayoReactAllListener);
+        }
     }
 
     private void forwardMessages(ArrayList<MessageObject> arrayList, boolean fromMyName, boolean hideCaption, boolean notify, int scheduleDate, long payStars) {
@@ -14658,36 +14816,26 @@ public class ChatActivity extends BaseFragment implements
             }
         }
         // Mayogram: bulk forwards (>1 message, not scheduled) from a
-        // RESTRICTED source go out one message at a time
-        // (MAYO_FORWARD_CHUNK_SIZE) instead of one big batch, with a "sent X
-        // of Y" progress bar - each message's delivery confirmation ticks it
-        // forward via mayoOnForwardMessageDelivered, which also sends the
-        // next one. This is what makes Cancel immediate: it just stops
-        // queuing anything further, so whichever single message is already
-        // in flight when Cancel is pressed finishes (can't be recalled), but
-        // the one after it never goes out. A single sendMessage() call
-        // forwarding all of them at once would hit the server as one atomic
-        // request - nothing left to interrupt by the time any progress is
-        // visible. An unrestricted source never takes that slow local
-        // re-upload path, so there's nothing for this UI to protect - it
-        // just forwards everything at once, like stock Telegram.
+        // RESTRICTED source go out one message at a time instead of one big
+        // batch, with a "sent X of Y" progress bar. The queue itself lives
+        // in MayogramForwardQueueController (registered once per account,
+        // independent of this fragment) specifically so closing the chat or
+        // backgrounding the app doesn't freeze it mid-forward - only this
+        // UI (the bar + its listener) is fragment-scoped. Cancel just stops
+        // queuing anything further: whichever single message is already in
+        // flight when Cancel is pressed finishes (can't be recalled), but
+        // the one after it never goes out. An unrestricted source never
+        // takes that slow local re-upload path, so there's nothing for this
+        // UI to protect - it just forwards everything at once, like stock
+        // Telegram.
         if (scheduleDate == 0 && arrayList.size() > 1 && getSendMessagesHelper().anyNeedsOwnerCacheReupload(arrayList)) {
-            mayoStartForwardProgress(java.util.Collections.singletonList(dialog_id), arrayList.size());
-            mayoForwardQueue = arrayList;
-            mayoForwardQueueNextIndex = 0;
-            mayoForwardQueueFromMyName = fromMyName;
-            mayoForwardQueueHideCaption = hideCaption;
-            mayoForwardQueueNotify = notify;
-            mayoForwardQueuePayStars = payStars;
-            int result = mayoSendNextForwardChunk();
-            AlertsCreator.showSendMediaAlert(result, this, themeDelegate);
-            if (result != 0) {
-                AndroidUtilities.runOnUIThread(() -> {
-                    waitingForSendingMessageLoad = false;
-                    hideFieldPanel(true);
-                });
-                mayoStopForwardProgress();
-            }
+            mayoStartForwardProgress(arrayList.size());
+            mayoCreateForwardListener();
+            org.telegram.messenger.MayogramForwardQueueController.startForward(currentAccount, dialog_id, arrayList, fromMyName, hideCaption, notify, payStars, mayoForwardListener);
+            AndroidUtilities.runOnUIThread(() -> {
+                waitingForSendingMessageLoad = false;
+                hideFieldPanel(true);
+            });
             return;
         }
         int result = getSendMessagesHelper().sendMessage(arrayList, dialog_id, fromMyName, hideCaption, notify, scheduleDate, 0, getThreadMessage(), -1, payStars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
@@ -22767,9 +22915,8 @@ public class ChatActivity extends BaseFragment implements
             ArrayList<Integer> markAsDeletedMessages = (ArrayList<Integer>) args[0];
             processDeletedMessages(markAsDeletedMessages, 0, false);
         } else if (id == NotificationCenter.messageReceivedByServer) {
-            if (mayoForwardProgressDialogIds != null && args[3] instanceof Long) {
-                mayoOnForwardMessageDelivered((Long) args[3], args[1] instanceof Integer ? (Integer) args[1] : 0);
-            }
+            // Mayogram: forward-queue progress is now driven entirely by
+            // MayogramForwardQueueController's own observer, not here.
             Boolean scheduled = (Boolean) args[6];
             if (scheduled != (chatMode == MODE_SCHEDULED)) {
                 return;
@@ -30200,6 +30347,11 @@ public class ChatActivity extends BaseFragment implements
         super.onResume();
         checkShowBlur(false);
         activityResumeTime = System.currentTimeMillis();
+        // Mayogram: a chunked forward may still be running headless in
+        // MayogramForwardQueueController from before this chat was closed -
+        // reattach to show its real current progress instead of nothing.
+        mayoAttachForwardListenerIfActive();
+        mayoAttachReactAllListenerIfActive();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
             ImportingAlert alert = new ImportingAlert(getParentActivity(), null, this, themeDelegate);
             alert.setOnHideListener(dialog -> {

@@ -33,9 +33,6 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
     private static final int BUTTON_RESCAN = 2;
     private static final int BUTTON_EXPORT = 3;
 
-    /** A scan older than this is treated as stale and auto-refreshed on open. */
-    private static final long STALE_AFTER_MS = 24 * 60 * 60 * 1000L;
-
     private int progressDone;
     private int progressTotal;
     private int progressUnique;
@@ -65,9 +62,12 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
                 listView.adapter.update(true);
             }
         });
-        long lastScan = MayogramCustomization.getFollowersLastScan(getCurrentAccount());
-        boolean stale = lastScan == 0 || System.currentTimeMillis() - lastScan > STALE_AFTER_MS;
-        if (!MayogramFollowersController.isScanning(getCurrentAccount()) && stale) {
+        // Mayogram: always rescan on open instead of trusting a cached scan
+        // from earlier - new subscribers since the last scan (even just a
+        // few hours old) were otherwise invisible until the next scan
+        // happened to be 24h+ stale. The screen still shows the previous
+        // numbers immediately while this runs in the background.
+        if (!MayogramFollowersController.isScanning(getCurrentAccount())) {
             startScanWithNotice();
         }
         return result;
