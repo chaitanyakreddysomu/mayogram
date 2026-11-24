@@ -1,9 +1,20 @@
 /*
  * Mayogram: "Compare" row in Settings -> Mayogram, below Followers. Pick 2+
- * of your owned channels (same avatar+tick row style as the other
- * multi-select Mayogram screens), scan them, and see how many distinct
- * people follow at least one of the selected channels, plus each channel's
- * own follower count.
+ * channels you own or admin (fetched live from your current dialogs, not
+ * the Followers-scan cache), scan them, and see how many distinct people
+ * follow at least one of the selected channels.
+ *
+ * Telegram caps how many individual subscriber identities channels.
+ * getParticipants will return for a broadcast channel (roughly 200,
+ * regardless of admin/owner status) - megagroups don't have this limit.
+ * The per-channel count shown in the result always uses chat.
+ * participants_count (Telegram's own accurate running total, never
+ * capped) rather than how many ids we actually got back, so a small
+ * channel's count is always exact. The "unique across N channels" number
+ * is still necessarily computed from whatever ids were actually fetched,
+ * since computing real overlap needs individual identities - for any
+ * channel over the ~200 cap that number is a best-effort lower bound, and
+ * the result screen says so.
  */
 package org.telegram.ui;
 
@@ -13,17 +24,20 @@ import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.MayogramCompareController;
-import org.telegram.messenger.MayogramCustomization;
 import org.telegram.messenger.MessagesController;
+
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.Cells.UserCell;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
@@ -38,6 +52,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 public class MayogramCompareActivity extends UniversalFragment implements MayogramCompareController.Listener {
 
@@ -52,6 +67,7 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
     private boolean hasResult;
     private int resultUnique;
     private HashMap<Long, Integer> resultPerChannel;
+    private String query = "";
 
     @Override
     protected CharSequence getTitle() {
@@ -71,6 +87,25 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
     @Override
     public View createView(Context context) {
         View view = super.createView(context);
+        ActionBarMenuItem searchItem = actionBar.createMenu().addItem(0, R.drawable.outline_header_search, getResourceProvider());
+        searchItem.setIsSearchField(true);
+        searchItem.setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+            @Override
+            public void onTextChanged(EditText editText) {
+                query = editText.getText().toString();
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+            }
+
+            @Override
+            public void onSearchCollapse() {
+                query = "";
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+            }
+        });
         if (view instanceof FrameLayout) {
             floatingButton = new FragmentFloatingButton(context, getResourceProvider());
             floatingButton.setImageResource(R.drawable.floating_check);
@@ -83,16 +118,25 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
 
     @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        List<TLRPC.Chat> chats = collectOwnedChannels();
+        List<TLRPC.Chat> allChats = collectCandidateChannels();
 
         if (hasResult && !comparing) {
             items.add(UItem.asHeader("RESULT"));
-            items.add(UItem.asShadow("Unique followers across the " + resultPerChannel.size() + " channels you compared: " + resultUnique));
-            for (int i = 0; i < chats.size(); i++) {
-                TLRPC.Chat chat = chats.get(i);
-                Integer count = resultPerChannel.get(chat.id);
-                if (count != null) {
-                    items.add(UItem.asCustom(buildResultRow(getContext(), chat, count)));
+            boolean anyCapped = false;
+            for (int i = 0; i < allChats.size(); i++) {
+                TLRPC.Chat chat = allChats.get(i);
+                Integer scanned = resultPerChannel.get(chat.id);
+                if (scanned != null && scanned < chat.participants_count) {
+                    anyCapped = true;
+                    break;
+                }
+            }
+            items.add(UItem.asShadow("Unique followers across the " + resultPerChannel.size() + " channels you compared: " + resultUnique
+                    + (anyCapped ? " (best-effort - Telegram only lets channels.getParticipants see roughly the first 200 subscribers of a channel, so this is a lower bound for any channel bigger than that)." : ".")));
+            for (int i = 0; i < allChats.size(); i++) {
+                TLRPC.Chat chat = allChats.get(i);
+                if (resultPerChannel.containsKey(chat.id)) {
+                    items.add(UItem.asCustom(buildResultRow(getContext(), chat)));
                 }
             }
             items.add(UItem.asShadow(null));
@@ -110,25 +154,33 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
         }
 
         items.add(UItem.asShadow(selectedChatIds.isEmpty()
-                ? "Select 2 or more of your owned channels, then tap the checkmark (bottom right)."
+                ? "Select 2 or more channels you own or admin, then tap the checkmark (bottom right)."
                 : selectedChatIds.size() + " selected" + (selectedChatIds.size() < 2 ? " - pick at least 2." : ".")));
 
         if (!selectedChatIds.isEmpty()) {
-            items.add(UItem.asCustom(buildSelectedStrip(getContext(), chats)));
+            items.add(UItem.asCustom(buildSelectedStrip(getContext(), allChats)));
         }
 
-        if (chats.isEmpty()) {
-            items.add(UItem.asShadow("No owned channels found yet - run a scan on the Followers screen first, so Mayogram knows which channels you own."));
-            return;
+        String q = query.trim().toLowerCase(Locale.getDefault());
+        int shown = 0;
+        for (int i = 0; i < allChats.size(); i++) {
+            TLRPC.Chat chat = allChats.get(i);
+            if (!q.isEmpty() && (chat.title == null || !chat.title.toLowerCase(Locale.getDefault()).contains(q))) {
+                continue;
+            }
+            shown++;
+            items.add(UItem.asCustom(buildChatRow(getContext(), chat)));
         }
-        for (int i = 0; i < chats.size(); i++) {
-            items.add(UItem.asCustom(buildChatRow(getContext(), chats.get(i))));
+        if (shown == 0) {
+            items.add(UItem.asShadow(allChats.isEmpty()
+                    ? "No channels found where you're the owner or an admin."
+                    : (q.isEmpty() ? "No channels found." : "No matches for \"" + query.trim() + "\".")));
         }
     }
 
-    private View buildResultRow(Context context, TLRPC.Chat chat, int count) {
+    private View buildResultRow(Context context, TLRPC.Chat chat) {
         UserCell cell = new UserCell(context, 16, 0, false);
-        cell.setData(chat, null, count + " followers", 0, false);
+        cell.setData(chat, null, chat.participants_count + " subscribers", 0, false);
         return cell;
     }
 
@@ -190,14 +242,19 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
         }
     }
 
-    private List<TLRPC.Chat> collectOwnedChannels() {
+    private List<TLRPC.Chat> collectCandidateChannels() {
         int account = getCurrentAccount();
         MessagesController controller = MessagesController.getInstance(account);
-        ArrayList<Long> ownedIds = MayogramCustomization.getOwnedChannelIds(account);
+        ArrayList<TLRPC.Dialog> dialogs = controller.getAllDialogs();
         ArrayList<TLRPC.Chat> chats = new ArrayList<>();
-        for (int i = 0; i < ownedIds.size(); i++) {
-            TLRPC.Chat chat = controller.getChat(ownedIds.get(i));
-            if (chat != null) {
+        for (int i = 0; i < dialogs.size(); i++) {
+            long dialogId = dialogs.get(i).id;
+            if (dialogId >= 0) {
+                continue;
+            }
+            TLRPC.Chat chat = controller.getChat(-dialogId);
+            if (chat != null && ChatObject.isChannel(chat) && !ChatObject.isNotInChat(chat)
+                    && (chat.creator || ChatObject.hasAdminRights(chat))) {
                 chats.add(chat);
             }
         }

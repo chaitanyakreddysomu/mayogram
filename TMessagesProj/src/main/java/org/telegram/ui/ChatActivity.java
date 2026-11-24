@@ -14509,7 +14509,7 @@ public class ChatActivity extends BaseFragment implements
     // native input-style bubble stacked right above it, not a foreign toast.
     private static final int MAYO_FORWARD_BAR_RADIUS_DP = 22;
     private static final int MAYO_FORWARD_BAR_SIDE_INSET_DP = 7;
-    private static final int MAYO_FORWARD_BAR_GAP_DP = 2;
+    private static final float MAYO_FORWARD_BAR_GAP_DP = 0.5f;
 
     private void mayoShowForwardProgressBar() {
         if (mayoForwardProgressBar != null || contentView == null || chatActivityEnterView == null) {
@@ -14633,6 +14633,14 @@ public class ChatActivity extends BaseFragment implements
      * fragment-independent lifetime as the forward queue above - closing
      * the chat only hides this bar, it doesn't stop the job.
      */
+    /**
+     * Mayogram: real reaction icons (same AnimatedEmojiDrawable.
+     * SwapAnimatedEmojiDrawable + TL_availableReaction.static_icon this app
+     * already uses for the double-tap-reaction setting), laid out as a
+     * horizontally scrolling strip - the same visual language as Telegram's
+     * own reaction bar, instead of a plain text list. "Random" gets its own
+     * icon (a shuffle glyph) rather than text, since it isn't a reaction.
+     */
     private void mayoShowReactToAllPicker() {
         if (getContext() == null) {
             return;
@@ -14644,16 +14652,92 @@ public class ChatActivity extends BaseFragment implements
             }
             return;
         }
-        ArrayList<String> options = new ArrayList<>(allowed);
-        options.add("🎲 Random");
-        CharSequence[] items = options.toArray(new CharSequence[0]);
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setTitle("React to All Messages");
-        builder.setItems(items, (dialog, which) -> {
-            java.util.List<String> pool = which == options.size() - 1 ? allowed : java.util.Collections.singletonList(allowed.get(which));
-            mayoStartReactToAll(pool);
+        Context context = getContext();
+        HashMap<String, TLRPC.TL_availableReaction> reactionsMap = MediaDataController.getInstance(currentAccount).getReactionsMap();
+
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(dp(16), dp(18), dp(16), dp(6));
+
+        final AlertDialog[] dialogHolder = new AlertDialog[1];
+
+        for (int i = 0; i < allowed.size(); i++) {
+            String emoji = allowed.get(i);
+            TLRPC.TL_availableReaction reaction = reactionsMap.get(emoji);
+            if (reaction == null || reaction.static_icon == null) {
+                continue;
+            }
+            MayoReactionIconCell cell = new MayoReactionIconCell(context);
+            cell.setReaction(reaction.static_icon);
+            cell.setOnClickListener(v -> {
+                if (dialogHolder[0] != null) {
+                    dialogHolder[0].dismiss();
+                }
+                mayoStartReactToAll(java.util.Collections.singletonList(emoji));
+            });
+            row.addView(cell, LayoutHelper.createLinear(44, 44, 0, 0, 0, 10, 0));
+        }
+
+        ImageView randomIcon = new ImageView(context);
+        randomIcon.setImageResource(R.drawable.menu_random);
+        randomIcon.setScaleType(ImageView.ScaleType.CENTER);
+        randomIcon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_messagePanelIcons), PorterDuff.Mode.MULTIPLY));
+        randomIcon.setOnClickListener(v -> {
+            if (dialogHolder[0] != null) {
+                dialogHolder[0].dismiss();
+            }
+            mayoStartReactToAll(allowed);
         });
-        showDialog(builder.create());
+        row.addView(randomIcon, LayoutHelper.createLinear(44, 44));
+
+        HorizontalScrollView scrollView = new HorizontalScrollView(context);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        scrollView.addView(row);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle("React to All Messages");
+        builder.setView(scrollView);
+        dialogHolder[0] = builder.create();
+        showDialog(dialogHolder[0]);
+    }
+
+    /** Mayogram: one reaction icon in mayoShowReactToAllPicker's strip - same AnimatedEmojiDrawable pattern as SetDefaultReactionCell. */
+    private class MayoReactionIconCell extends FrameLayout {
+        private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable imageDrawable;
+
+        MayoReactionIconCell(Context context) {
+            super(context);
+            imageDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(28));
+        }
+
+        void setReaction(TLRPC.Document document) {
+            imageDrawable.set(document, false);
+            imageDrawable.play();
+        }
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            super.dispatchDraw(canvas);
+            imageDrawable.setBounds(
+                    (getWidth() - imageDrawable.getIntrinsicWidth()) / 2,
+                    (getHeight() - imageDrawable.getIntrinsicHeight()) / 2,
+                    (getWidth() + imageDrawable.getIntrinsicWidth()) / 2,
+                    (getHeight() + imageDrawable.getIntrinsicHeight()) / 2
+            );
+            imageDrawable.draw(canvas);
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            imageDrawable.attach();
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            imageDrawable.detach();
+        }
     }
 
     private ArrayList<String> mayoGetAllowedReactionEmojis() {
