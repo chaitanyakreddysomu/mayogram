@@ -86,6 +86,16 @@ public class MayogramCustomization {
         prefs().edit().putBoolean("mayo_time_with_seconds", enabled).apply();
     }
 
+    // --- Appearance: liquid glass style -------------------------------------
+
+    public static boolean isLiquidGlassEnabled() {
+        return prefs().getBoolean("mayo_liquid_glass", false);
+    }
+
+    public static void setLiquidGlassEnabled(boolean enabled) {
+        prefs().edit().putBoolean("mayo_liquid_glass", enabled).apply();
+    }
+
     // --- Local Premium: device-only cosmetic toggle, never touches the real
     // account's premium status or anything sent to the server --------------
 

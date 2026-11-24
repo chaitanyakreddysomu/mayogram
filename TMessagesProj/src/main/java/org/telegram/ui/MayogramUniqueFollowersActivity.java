@@ -62,14 +62,6 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
                 listView.adapter.update(true);
             }
         });
-        // Mayogram: always rescan on open instead of trusting a cached scan
-        // from earlier - new subscribers since the last scan (even just a
-        // few hours old) were otherwise invisible until the next scan
-        // happened to be 24h+ stale. The screen still shows the previous
-        // numbers immediately while this runs in the background.
-        if (!MayogramFollowersController.isScanning(getCurrentAccount())) {
-            startScanWithNotice();
-        }
         return result;
     }
 
@@ -148,7 +140,9 @@ public class MayogramUniqueFollowersActivity extends UniversalFragment implement
             }
         } else {
             items.add(UItem.asHeader("FOLLOWERS"));
-            items.add(UItem.asShadow("Starting scan..."));
+            items.add(UItem.asShadow("Scan your owned channels to see how many people follow at least one of them."));
+            items.add(UItem.asButton(BUTTON_RESCAN, "Scan Now"));
+            items.add(UItem.asShadow(null));
         }
     }
 

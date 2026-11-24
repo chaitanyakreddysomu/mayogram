@@ -1,6 +1,7 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -11,7 +12,13 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProviderThemed;
+import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
 import org.telegram.ui.Delegates.MemberRequestsDelegate;
+
+import static org.telegram.messenger.AndroidUtilities.dp;
 
 public class MemberRequestsActivity extends BaseFragment {
 
@@ -38,9 +45,20 @@ public class MemberRequestsActivity extends BaseFragment {
         };
     }
 
+    /** Mayogram: a soft translucent pill behind an action-bar icon/icon-group (back button, or the combined search+approve-all group), matching the frosted/liquid-glass look used elsewhere in the app. */
+    private Drawable mayoGlassPillBackground(int radiusDp) {
+        BlurredBackgroundSourceColor source = new BlurredBackgroundSourceColor();
+        source.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        BlurredBackgroundDrawable drawable = source.createDrawable();
+        drawable.setColorProvider(new BlurredBackgroundColorProviderThemed(getResourceProvider(), Theme.key_windowBackgroundWhite));
+        drawable.setRadius(dp(radiusDp));
+        return drawable;
+    }
+
     @Override
     public View createView(Context context) {
         actionBar.setAllowOverlayTitle(true);
+        actionBar.centerTitle();
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -52,10 +70,14 @@ public class MemberRequestsActivity extends BaseFragment {
             }
         });
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        actionBar.getBackButton().setBackground(mayoGlassPillBackground(18));
         actionBar.setTitle(delegate.isChannel ? LocaleController.getString(R.string.SubscribeRequests) : LocaleController.getString(R.string.MemberRequests));
 
         ActionBarMenu menu = actionBar.createMenu();
-        ActionBarMenuItem approveAllItem = menu.addItem(approveAllMenuItem, R.drawable.filled_requests_24);
+        // Mayogram: search + approve-all share one pill background (set on
+        // the menu container itself) instead of each getting its own circle.
+        menu.setBackground(mayoGlassPillBackground(18));
+        ActionBarMenuItem approveAllItem = menu.addItem(approveAllMenuItem, R.drawable.ic_ab_done);
         approveAllItem.setContentDescription(LocaleController.getString(R.string.ApproveAllRequests));
         approveAllItem.setVisibility(View.GONE);
 

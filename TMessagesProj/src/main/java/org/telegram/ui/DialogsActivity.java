@@ -2806,9 +2806,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             });
 
             iBlur3FactoryFrostedLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlassFrosted);
-            iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled());
             iBlur3FactoryLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlass);
-            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled());
             iBlur3FactoryBlur = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlassFrosted);
         } else {
             scrollableViewNoiseSuppressor = null;
@@ -4898,7 +4898,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
             BlurredBackgroundWithFadeDrawable fadeDrawable = new BlurredBackgroundWithFadeDrawable(
                     iBlur3FactoryFade.create(chatInputViewsContainer, null));
-            if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) {
+            if (!SharedConfig.chatBlurEnabled() || org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled()) {
                 fadeDrawable.setFadeHeight(dp(72), true);
             }
 
@@ -5994,17 +5994,31 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         bulletin.show();
     }
 
+    private static final String MAYO_PREF_LAST_AUTO_UPDATE_CHECK = "mayo_last_auto_update_check";
+    private static final long MAYO_AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L;
+
     /**
-     * Mayogram: checks version.json once per DialogsActivity creation and,
-     * if a newer version is listed, shows a top-panel bar (same slot style
-     * as the music-player/location bars above) with an "Update" affordance
-     * on the trailing end. Tapping it opens AppUpdateSheet, the existing
-     * update screen (changelog + download + install).
+     * Mayogram: checks version.json at most once a day, the first time a
+     * DialogsActivity is created after that day's interval has passed
+     * (effectively: once per app open per day, not on every re-creation of
+     * this fragment) - and if a newer version is listed, shows a top-panel
+     * bar (same slot style as the music-player/location bars above) with an
+     * "Update" affordance on the trailing end. Tapping it opens
+     * AppUpdateSheet, the existing update screen (changelog + download +
+     * install). A user-triggered check (e.g. opening AppUpdateSheet
+     * directly) goes straight to AppUpdateController.check and isn't subject
+     * to this throttle.
      */
     private void mayoCheckForUpdate() {
         if (mayoUpdateHintCell == null || topPanelLayout == null) {
             return;
         }
+        SharedPreferences prefs = MessagesController.getGlobalMainSettings();
+        long lastCheck = prefs.getLong(MAYO_PREF_LAST_AUTO_UPDATE_CHECK, 0);
+        if (System.currentTimeMillis() - lastCheck < MAYO_AUTO_UPDATE_CHECK_INTERVAL_MS) {
+            return;
+        }
+        prefs.edit().putLong(MAYO_PREF_LAST_AUTO_UPDATE_CHECK, System.currentTimeMillis()).apply();
         org.telegram.messenger.AppUpdateController.check((info, error) -> {
             if (mayoUpdateHintCell == null || topPanelLayout == null) {
                 return;
@@ -14330,14 +14344,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         boolean hasBottomBlur = false;
         if (hasMainTabs) {
             iBlur3PositionMainTabs.set(0, mainTabTop, fragmentView.getMeasuredWidth(), mainTabBottom);
-            iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
+            iBlur3PositionMainTabs.inset(0, org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled() ? 0 : -dp(48));
 
             hasBottomBlur = true;
         } else if (commentView != null && chatInputViewsContainer != null) {
             iBlur3PositionMainTabs.set(0,
                 fragmentView.getMeasuredHeight() - calculateListViewPaddingBottom(),
                 fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());
-            iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
+            iBlur3PositionMainTabs.inset(0, org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled() ? 0 : -dp(48));
 
             hasBottomBlur = true;
         }

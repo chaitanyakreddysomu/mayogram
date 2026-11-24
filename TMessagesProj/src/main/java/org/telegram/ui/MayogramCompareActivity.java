@@ -34,6 +34,7 @@ import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.MayogramCompareController;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
@@ -50,11 +51,12 @@ import org.telegram.ui.Components.UniversalFragment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
-public class MayogramCompareActivity extends UniversalFragment implements MayogramCompareController.Listener {
+public class MayogramCompareActivity extends UniversalFragment implements MayogramCompareController.Listener, NotificationCenter.NotificationCenterDelegate {
 
     private final LinkedHashSet<Long> selectedChatIds = new LinkedHashSet<>();
     private FragmentFloatingButton floatingButton;
@@ -69,6 +71,14 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
     private HashMap<Long, Integer> resultPerChannel;
     private String query = "";
 
+    // Mayogram: chat.participants_count isn't always populated on the plain
+    // Chat objects we get from the dialogs list (the server only sends it
+    // conditionally), so it can read as 0 even for real channels. We fall
+    // back to the cached/loaded ChatFull's participants_count instead, which
+    // is always accurate, kicking off a load the first time it's missing and
+    // refreshing once chatInfoDidLoad fires.
+    private final HashSet<Long> requestedFullChatIds = new HashSet<>();
+
     @Override
     protected CharSequence getTitle() {
         return "Compare Channels";
@@ -81,7 +91,38 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
             comparing = true;
             MayogramCompareController.attachListener(getCurrentAccount(), this);
         }
+        getNotificationCenter().addObserver(this, NotificationCenter.chatInfoDidLoad);
         return result;
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        getNotificationCenter().removeObserver(this, NotificationCenter.chatInfoDidLoad);
+        super.onFragmentDestroy();
+    }
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.chatInfoDidLoad) {
+            TLRPC.ChatFull chatFull = (TLRPC.ChatFull) args[0];
+            if (chatFull != null && requestedFullChatIds.contains(chatFull.id) && listView != null) {
+                listView.adapter.update(true);
+            }
+        }
+    }
+
+    private int getAccurateSubscriberCount(TLRPC.Chat chat) {
+        TLRPC.ChatFull full = getMessagesController().getChatFull(chat.id);
+        if (full != null && full.participants_count > 0) {
+            return full.participants_count;
+        }
+        if (chat.participants_count > 0) {
+            return chat.participants_count;
+        }
+        if (requestedFullChatIds.add(chat.id)) {
+            getMessagesController().loadFullChat(chat.id, 0, true);
+        }
+        return -1;
     }
 
     @Override
@@ -126,7 +167,8 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
             for (int i = 0; i < allChats.size(); i++) {
                 TLRPC.Chat chat = allChats.get(i);
                 Integer scanned = resultPerChannel.get(chat.id);
-                if (scanned != null && scanned < chat.participants_count) {
+                int accurate = getAccurateSubscriberCount(chat);
+                if (scanned != null && accurate > 0 && scanned < accurate) {
                     anyCapped = true;
                     break;
                 }
@@ -180,16 +222,24 @@ public class MayogramCompareActivity extends UniversalFragment implements Mayogr
 
     private View buildResultRow(Context context, TLRPC.Chat chat) {
         UserCell cell = new UserCell(context, 16, 0, false);
-        cell.setData(chat, null, chat.participants_count + " subscribers", 0, false);
+        cell.setData(chat, null, subscriberCountLabel(chat), 0, false);
         return cell;
     }
 
     private View buildChatRow(Context context, TLRPC.Chat chat) {
         UserCell cell = new UserCell(context, 16, 2, false);
-        cell.setData(chat, null, null, 0, false);
+        cell.setData(chat, null, subscriberCountLabel(chat), 0, false);
         cell.setChecked(selectedChatIds.contains(chat.id), false);
         cell.setOnClickListener(v -> toggleSelection(chat));
         return cell;
+    }
+
+    private String subscriberCountLabel(TLRPC.Chat chat) {
+        int count = getAccurateSubscriberCount(chat);
+        if (count < 0) {
+            return "Loading...";
+        }
+        return count + (count == 1 ? " subscriber" : " subscribers");
     }
 
     private View buildSelectedStrip(Context context, List<TLRPC.Chat> chats) {

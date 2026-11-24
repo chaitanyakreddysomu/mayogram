@@ -359,10 +359,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     // Mayogram: small pill below the "public/private channel" subtitle
     // (onlineTextView[1], the default/collapsed header row - onlineTextView[0]
     // is the large title overlay shown only while the avatar is pulled down)
-    // showing the channel's numeric id. Positioned manually in
-    // avatarContainer2's onLayout from onlineTextView[1]'s real post-layout
-    // bounds, not a guessed static margin.
-    private TextView profileChannelIdPillView;
+    // showing the currently selected media-tab's item count (e.g. "4 links",
+    // "222 music files") instead of the channel's numeric id. Positioned
+    // manually in avatarContainer2's onLayout from onlineTextView[1]'s real
+    // post-layout bounds, not a guessed static margin.
+    private TextView profileMediaCountPillView;
     private AudioPlayerAlert.ClippingTextViewSwitcher mediaCounterTextView;
     private RLottieImageView writeButton;
     private AnimatorSet writeButtonAnimation;
@@ -2086,7 +2087,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             //iBlur3SourceGlassFrosted = new BlurredBackgroundSourceRenderNode(null);
             iBlur3SourceGlass = new BlurredBackgroundSourceRenderNode(null);
             iBlur3FactoryLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlass);
-            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled());
         } else {
             scrollableViewNoiseSuppressor = null;
             //iBlur3SourceGlassFrosted = null;
@@ -5213,11 +5214,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 // static spot. Horizontally it's centered across the whole header
                 // width (not aligned to the subtitle's left edge), sitting between
                 // the subtitle row and the Mute/Search/Share/Edit buttons row below.
-                if (profileChannelIdPillView != null && profileChannelIdPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
-                    float pillX = (getMeasuredWidth() - profileChannelIdPillView.getMeasuredWidth()) / 2f;
+                if (profileMediaCountPillView != null && profileMediaCountPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
+                    float pillX = (getMeasuredWidth() - profileMediaCountPillView.getMeasuredWidth()) / 2f;
                     float pillY = onlineTextView[1].getY() + onlineTextView[1].getMeasuredHeight() + dp(2);
-                    profileChannelIdPillView.setTranslationX(pillX - profileChannelIdPillView.getLeft());
-                    profileChannelIdPillView.setTranslationY(pillY - profileChannelIdPillView.getTop());
+                    profileMediaCountPillView.setTranslationX(pillX - profileMediaCountPillView.getLeft());
+                    profileMediaCountPillView.setTranslationY(pillY - profileMediaCountPillView.getTop());
                 }
                 super.dispatchDraw(canvas);
                 if (transitionOnlineText != null) {
@@ -5300,16 +5301,16 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
                 super.onLayout(changed, left, top, right, bottom);
                 updateCollectibleHint();
-                if (profileChannelIdPillView != null && profileChannelIdPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
+                if (profileMediaCountPillView != null && profileMediaCountPillView.getVisibility() == View.VISIBLE && onlineTextView[1] != null) {
                     // Mayogram: this just gives the pill a sane static layout box
                     // (and resets any stale translation from a previous frame) -
                     // dispatchDraw() above re-anchors it to onlineTextView[1]'s real,
                     // translated on-screen position every frame.
                     int pillLeft = onlineTextView[1].getLeft();
                     int pillTop = onlineTextView[1].getBottom() + dp(2);
-                    profileChannelIdPillView.layout(pillLeft, pillTop, pillLeft + profileChannelIdPillView.getMeasuredWidth(), pillTop + profileChannelIdPillView.getMeasuredHeight());
-                    profileChannelIdPillView.setTranslationX(0);
-                    profileChannelIdPillView.setTranslationY(0);
+                    profileMediaCountPillView.layout(pillLeft, pillTop, pillLeft + profileMediaCountPillView.getMeasuredWidth(), pillTop + profileMediaCountPillView.getMeasuredHeight());
+                    profileMediaCountPillView.setTranslationX(0);
+                    profileMediaCountPillView.setTranslationY(0);
                 }
             }
         };
@@ -8039,6 +8040,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    /** Mayogram: mirrors whatever updateSelectedMediaTabText() puts in the search-mode media counter into profileMediaCountPillView too, so the collapsed-header pill always shows the same "4 Links"/"222 Music files" text as the currently selected tab below. */
+    private void mayoSetMediaCounterText(CharSequence text) {
+        mediaCounterTextView.setText(text);
+        if (profileMediaCountPillView != null) {
+            profileMediaCountPillView.setText(text);
+        }
+    }
+
     public void updateSelectedMediaTabText() {
         if (sharedMediaLayout == null || mediaCounterTextView == null) {
             return;
@@ -8048,80 +8057,80 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         if (id == SharedMediaLayout.TAB_PHOTOVIDEO) {
             if (mediaCount[MediaDataController.MEDIA_VIDEOS_ONLY] <= 0 && mediaCount[MediaDataController.MEDIA_PHOTOS_ONLY] <= 0) {
                 if (mediaCount[MediaDataController.MEDIA_PHOTOVIDEO] <= 0) {
-                    mediaCounterTextView.setText(LocaleController.getString(R.string.SharedMedia));
+                    mayoSetMediaCounterText(LocaleController.getString(R.string.SharedMedia));
                 } else {
-                    mediaCounterTextView.setText(LocaleController.formatPluralString("Media", mediaCount[MediaDataController.MEDIA_PHOTOVIDEO]));
+                    mayoSetMediaCounterText(LocaleController.formatPluralString("Media", mediaCount[MediaDataController.MEDIA_PHOTOVIDEO]));
                 }
             } else if (sharedMediaLayout.getPhotosVideosTypeFilter() == SharedMediaLayout.FILTER_PHOTOS_ONLY || mediaCount[MediaDataController.MEDIA_VIDEOS_ONLY] <= 0) {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("Photos", mediaCount[MediaDataController.MEDIA_PHOTOS_ONLY]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("Photos", mediaCount[MediaDataController.MEDIA_PHOTOS_ONLY]));
             } else if (sharedMediaLayout.getPhotosVideosTypeFilter() == SharedMediaLayout.FILTER_VIDEOS_ONLY || mediaCount[MediaDataController.MEDIA_PHOTOS_ONLY] <= 0) {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("Videos", mediaCount[MediaDataController.MEDIA_VIDEOS_ONLY]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("Videos", mediaCount[MediaDataController.MEDIA_VIDEOS_ONLY]));
             } else {
                 String str = String.format("%s, %s", LocaleController.formatPluralString("Photos", mediaCount[MediaDataController.MEDIA_PHOTOS_ONLY]), LocaleController.formatPluralString("Videos", mediaCount[MediaDataController.MEDIA_VIDEOS_ONLY]));
-                mediaCounterTextView.setText(str);
+                mayoSetMediaCounterText(str);
             }
         } else if (id == SharedMediaLayout.TAB_FILES) {
             if (mediaCount[MediaDataController.MEDIA_FILE] <= 0) {
-                mediaCounterTextView.setText(LocaleController.getString(R.string.Files));
+                mayoSetMediaCounterText(LocaleController.getString(R.string.Files));
             } else {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("Files", mediaCount[MediaDataController.MEDIA_FILE]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("Files", mediaCount[MediaDataController.MEDIA_FILE]));
             }
         } else if (id == SharedMediaLayout.TAB_VOICE) {
             if (mediaCount[MediaDataController.MEDIA_AUDIO] <= 0) {
-                mediaCounterTextView.setText(LocaleController.getString(R.string.Voice));
+                mayoSetMediaCounterText(LocaleController.getString(R.string.Voice));
             } else {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("Voice", mediaCount[MediaDataController.MEDIA_AUDIO]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("Voice", mediaCount[MediaDataController.MEDIA_AUDIO]));
             }
         } else if (id == SharedMediaLayout.TAB_LINKS) {
             if (mediaCount[MediaDataController.MEDIA_URL] <= 0) {
-                mediaCounterTextView.setText(LocaleController.getString(R.string.SharedLinks));
+                mayoSetMediaCounterText(LocaleController.getString(R.string.SharedLinks));
             } else {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("Links", mediaCount[MediaDataController.MEDIA_URL]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("Links", mediaCount[MediaDataController.MEDIA_URL]));
             }
         } else if (id == SharedMediaLayout.TAB_AUDIO) {
             if (mediaCount[MediaDataController.MEDIA_MUSIC] <= 0) {
-                mediaCounterTextView.setText(LocaleController.getString(R.string.Music));
+                mayoSetMediaCounterText(LocaleController.getString(R.string.Music));
             } else {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("MusicFiles", mediaCount[MediaDataController.MEDIA_MUSIC]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("MusicFiles", mediaCount[MediaDataController.MEDIA_MUSIC]));
             }
         } else if (id == SharedMediaLayout.TAB_GIF) {
             if (mediaCount[MediaDataController.MEDIA_GIF] <= 0) {
-                mediaCounterTextView.setText(LocaleController.getString(R.string.AccDescrGIFs));
+                mayoSetMediaCounterText(LocaleController.getString(R.string.AccDescrGIFs));
             } else {
-                mediaCounterTextView.setText(LocaleController.formatPluralString("GIFs", mediaCount[MediaDataController.MEDIA_GIF]));
+                mayoSetMediaCounterText(LocaleController.formatPluralString("GIFs", mediaCount[MediaDataController.MEDIA_GIF]));
             }
         } else if (id == SharedMediaLayout.TAB_COMMON_GROUPS) {
-            mediaCounterTextView.setText(LocaleController.formatPluralString("CommonGroups", userInfo.common_chats_count));
+            mayoSetMediaCounterText(LocaleController.formatPluralString("CommonGroups", userInfo.common_chats_count));
         } else if (id == SharedMediaLayout.TAB_GROUPUSERS) {
-            mediaCounterTextView.setText(onlineTextView[1].getText());
+            mayoSetMediaCounterText(onlineTextView[1].getText());
         } else if (id == SharedMediaLayout.TAB_STORIES || SharedMediaLayout.isStoryAlbumPageType(id)) {
             if (isBot) {
-                mediaCounterTextView.setText(sharedMediaLayout.getBotPreviewsSubtitle(false));
+                mayoSetMediaCounterText(sharedMediaLayout.getBotPreviewsSubtitle(false));
             } else {
                 int count = sharedMediaLayout.getStoriesCount(id);
                 if (count > 0) {
-                    mediaCounterTextView.setText(LocaleController.formatPluralString("ProfileStoriesCount", sharedMediaLayout.getStoriesCount(id)));
+                    mayoSetMediaCounterText(LocaleController.formatPluralString("ProfileStoriesCount", sharedMediaLayout.getStoriesCount(id)));
                 } else {
-                    mediaCounterTextView.setText(getString(R.string.ProfileStoriesCountZero));
+                    mayoSetMediaCounterText(getString(R.string.ProfileStoriesCountZero));
                 }
             }
         } else if (id == SharedMediaLayout.TAB_BOT_PREVIEWS) {
-            mediaCounterTextView.setText(sharedMediaLayout.getBotPreviewsSubtitle(true));
+            mayoSetMediaCounterText(sharedMediaLayout.getBotPreviewsSubtitle(true));
         } else if (id == SharedMediaLayout.TAB_ARCHIVED_STORIES) {
-            mediaCounterTextView.setText(LocaleController.formatPluralString("ProfileStoriesArchiveCount", sharedMediaLayout.getStoriesCount(id)));
+            mayoSetMediaCounterText(LocaleController.formatPluralString("ProfileStoriesArchiveCount", sharedMediaLayout.getStoriesCount(id)));
         } else if (id == SharedMediaLayout.TAB_RECOMMENDED_CHANNELS) {
             final MessagesController.ChannelRecommendations rec = MessagesController.getInstance(currentAccount).getChannelRecommendations(getDialogId());
-            mediaCounterTextView.setText(LocaleController.formatPluralString(isBot ? "Bots" : "Channels", rec == null ? 0 : rec.chats.size() + rec.more));
+            mayoSetMediaCounterText(LocaleController.formatPluralString(isBot ? "Bots" : "Channels", rec == null ? 0 : rec.chats.size() + rec.more));
         } else if (id == SharedMediaLayout.TAB_SAVED_MESSAGES) {
             int messagesCount = getMessagesController().getSavedMessagesController().getMessagesCount(getDialogId());
-            mediaCounterTextView.setText(LocaleController.formatPluralString("SavedMessagesCount", Math.max(1, messagesCount)));
+            mayoSetMediaCounterText(LocaleController.formatPluralString("SavedMessagesCount", Math.max(1, messagesCount)));
         } else if (id == SharedMediaLayout.TAB_GIFTS) {
-            mediaCounterTextView.setText(LocaleController.formatPluralStringComma("ProfileGiftsCount", sharedMediaLayout.giftsContainer == null ? 0 : sharedMediaLayout.giftsContainer.getGiftsCount()));
+            mayoSetMediaCounterText(LocaleController.formatPluralStringComma("ProfileGiftsCount", sharedMediaLayout.giftsContainer == null ? 0 : sharedMediaLayout.giftsContainer.getGiftsCount()));
         } else if (id == SharedMediaLayout.TAB_POLL) {
             if (mediaCount[MediaDataController.MEDIA_POLL] <= 0) {
-                mediaCounterTextView.setText(LocaleController.getString(R.string.SharedPollTab));
+                mayoSetMediaCounterText(LocaleController.getString(R.string.SharedPollTab));
             } else {
-                mediaCounterTextView.setText(LocaleController.formatPluralStringComma("ProfilePollsCount", mediaCount[MediaDataController.MEDIA_POLL]));
+                mayoSetMediaCounterText(LocaleController.formatPluralStringComma("ProfilePollsCount", mediaCount[MediaDataController.MEDIA_POLL]));
             }
         }
     }
@@ -11259,6 +11268,17 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
     private MessagesController.PeerColor peerColor;
 
+    /**
+     * Mayogram: whether profileMediaCountPillView should show at all - its
+     * actual text comes from updateSelectedMediaTabText()/
+     * mayoSetMediaCounterText() (same "4 Links"/"222 Music files" text as
+     * the search-mode media counter), kept in sync with whichever tab is
+     * selected below.
+     */
+    private boolean mayoShouldShowMediaCountPill() {
+        return sharedMediaLayout != null && mediaCounterTextView != null;
+    }
+
     private void updateProfileData(boolean reload) {
         if (avatarContainer == null || nameTextView == null || getParentActivity() == null) {
             return;
@@ -11867,32 +11887,34 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
                 if (a == 1) {
-                    // Mayogram: channel-id pill, directly below this row (the
+                    // Mayogram: media-count pill, directly below this row (the
                     // same condition already gating the "public/private
                     // channel" subtitle text set above, so it only shows
-                    // wherever that subtitle itself would).
-                    boolean showIdPill = !isTopic && ChatObject.isChannel(chat);
-                    if (showIdPill) {
-                        if (profileChannelIdPillView == null) {
-                            profileChannelIdPillView = new TextView(getContext());
-                            profileChannelIdPillView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubtitle));
-                            profileChannelIdPillView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
-                            profileChannelIdPillView.setSingleLine(true);
-                            profileChannelIdPillView.setPadding(dp(6), dp(1), dp(6), dp(1));
-                            profileChannelIdPillView.setGravity(Gravity.CENTER);
+                    // wherever that subtitle itself would) - shows the
+                    // currently selected media tab's item count instead of
+                    // the channel's numeric id.
+                    boolean showCountPill = !isTopic && ChatObject.isChannel(chat) && mayoShouldShowMediaCountPill();
+                    if (showCountPill) {
+                        if (profileMediaCountPillView == null) {
+                            profileMediaCountPillView = new TextView(getContext());
+                            profileMediaCountPillView.setTextColor(getThemedColor(Theme.key_actionBarDefaultSubtitle));
+                            profileMediaCountPillView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
+                            profileMediaCountPillView.setSingleLine(true);
+                            profileMediaCountPillView.setPadding(dp(6), dp(1), dp(6), dp(1));
+                            profileMediaCountPillView.setGravity(Gravity.CENTER);
                             GradientDrawable pillBg = new GradientDrawable();
                             pillBg.setShape(GradientDrawable.RECTANGLE);
                             pillBg.setCornerRadius(dp(7));
                             pillBg.setColor((getThemedColor(Theme.key_actionBarDefaultSubtitle) & 0x00FFFFFF) | 0x26000000);
-                            profileChannelIdPillView.setBackground(pillBg);
+                            profileMediaCountPillView.setBackground(pillBg);
                             // Placeholder position until avatarContainer2's onLayout
                             // repositions it from onlineTextView[1]'s real bounds.
-                            avatarContainer2.addView(profileChannelIdPillView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 105, 20, 0, 0));
+                            avatarContainer2.addView(profileMediaCountPillView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 105, 20, 0, 0));
                         }
-                        profileChannelIdPillView.setText("-100" + chat.id);
-                        profileChannelIdPillView.setVisibility(View.VISIBLE);
-                    } else if (profileChannelIdPillView != null) {
-                        profileChannelIdPillView.setVisibility(View.GONE);
+                        profileMediaCountPillView.setVisibility(View.VISIBLE);
+                        updateSelectedMediaTabText();
+                    } else if (profileMediaCountPillView != null) {
+                        profileMediaCountPillView.setVisibility(View.GONE);
                     }
                 }
                 if (a == 1 && isTopic) {
@@ -17002,7 +17024,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
         iBlur3PositionActionBar.set(0, -additionalList, fragmentView.getMeasuredWidth(), actionBar.getMeasuredHeight() + additionalList);
         iBlur3PositionMainTabs.set(0, mainTabTop, fragmentView.getMeasuredWidth(), mainTabBottom);
-        iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
+        iBlur3PositionMainTabs.inset(0, org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled() ? 0 : -dp(48));
 
         scrollableViewNoiseSuppressor.setupRenderNodes(iBlur3Positions, 2);
         scrollableViewNoiseSuppressor.invalidateResultRenderNodes(iBlur3Capture, fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());

@@ -77,6 +77,9 @@ import org.telegram.ui.Cells.TextCheckCell2;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.BulletinFactory;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProviderThemed;
+import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.FlickerLoadingView;
 import org.telegram.ui.Components.GigagroupConvertAlert;
@@ -630,12 +633,24 @@ public class ChatUsersActivity extends BaseFragment implements NotificationCente
         getNotificationCenter().removeObserver(this, NotificationCenter.dialogDeleted);
     }
 
+    /** Mayogram: a soft translucent circular pill behind an action-bar icon (back button, search), matching the frosted/liquid-glass look used elsewhere in the app. */
+    private Drawable mayoGlassPillBackground(int radiusDp) {
+        BlurredBackgroundSourceColor source = new BlurredBackgroundSourceColor();
+        source.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        BlurredBackgroundDrawable drawable = source.createDrawable();
+        drawable.setColorProvider(new BlurredBackgroundColorProviderThemed(getResourceProvider(), Theme.key_windowBackgroundWhite));
+        drawable.setRadius(dp(radiusDp));
+        return drawable;
+    }
+
     @Override
     public View createView(Context context) {
         searching = false;
 
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
+        actionBar.centerTitle();
+        actionBar.getBackButton().setBackground(mayoGlassPillBackground(18));
         if (type == TYPE_KICKED) {
             actionBar.setTitle(getString("ChannelPermissions", R.string.ChannelPermissions));
         } else if (type == TYPE_BANNED) {
@@ -726,6 +741,13 @@ public class ChatUsersActivity extends BaseFragment implements NotificationCente
             }
             if (!(ChatObject.isChannel(currentChat) || currentChat.creator)) {
                 searchItem.setVisibility(View.GONE);
+            }
+            if (type == TYPE_USERS && selectType == SELECT_TYPE_MEMBERS) {
+                // Mayogram: only the plain Subscribers/Members list gets the
+                // glass pill - other uses of this same search item (banned,
+                // kicked/exceptions) keep the stock look since they can also
+                // show a "Done" button alongside it.
+                searchItem.setBackground(mayoGlassPillBackground(18));
             }
 
             if (type == TYPE_KICKED) {

@@ -44,6 +44,7 @@ public class MayogramCustomizeActivity extends UniversalFragment {
     private static final int SLIDER_AVATAR_SHAPE = 4;
     private static final int BUTTON_TITLE_MODE = 5;
     private static final int BUTTON_RESET = 6;
+    private static final int SWITCH_LIQUID_GLASS = 7;
 
     private static final int[] SWATCHES = {
             0, // "default" / theme color
@@ -85,6 +86,11 @@ public class MayogramCustomizeActivity extends UniversalFragment {
         items.add(UItem.asButton(BUTTON_TITLE_MODE, titleModeLabel()));
         items.add(UItem.asShadow("What shows at the top of your Chats list."));
 
+        items.add(UItem.asHeader("GLASS STYLE"));
+        items.add(UItem.asSwitch(SWITCH_LIQUID_GLASS, "Liquid Glass")
+                .setChecked(MayogramCustomization.isLiquidGlassEnabled()));
+        items.add(UItem.asShadow("Use a liquid glass look instead of frosted glass for the bottom bar, top pill, back and more buttons."));
+
         items.add(UItem.asButton(BUTTON_RESET, "Reset to Defaults").red());
         items.add(UItem.asShadow(null));
     }
@@ -111,6 +117,9 @@ public class MayogramCustomizeActivity extends UniversalFragment {
             showColorPicker();
         } else if (item.id == BUTTON_TITLE_MODE) {
             showTitleModePicker();
+        } else if (item.id == SWITCH_LIQUID_GLASS) {
+            MayogramCustomization.setLiquidGlassEnabled(!MayogramCustomization.isLiquidGlassEnabled());
+            listView.adapter.update(true);
         } else if (item.id == BUTTON_RESET) {
             MayogramCustomization.resetAppearanceDefaults();
             getNotificationCenter().postNotificationName(org.telegram.messenger.NotificationCenter.mayogramTitleModeChanged);
