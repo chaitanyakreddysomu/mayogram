@@ -115,8 +115,11 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
         c.save();
         c.translate(-sL, -sT);
         if (liquidGlassEffect != null && Build.VERSION.SDK_INT >= 33) {
+            // Mayogram: thicker default edge band (was dp(11)) so the
+            // refraction reads clearly instead of being a near-invisible
+            // sliver that looks like plain frosted blur.
             final int thickness = Math.max(Math.min(
-                boundProps.liquidThickness <= 0 ? dp(11) : boundProps.liquidThickness,
+                boundProps.liquidThickness <= 0 ? dp(16) : boundProps.liquidThickness,
                 Math.min(boundProps.boundsWithPadding.width(), boundProps.boundsWithPadding.height()) / 5), 1);
 
             liquidGlassEffect.update(

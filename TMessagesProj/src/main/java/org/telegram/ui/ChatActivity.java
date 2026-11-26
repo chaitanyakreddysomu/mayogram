@@ -45147,6 +45147,10 @@ public class ChatActivity extends BaseFragment implements
     }
 
     public void showPremiumFloodWaitBulletin(final boolean isUpload) {
+        // Mayogram: never show the "Premium required for faster downloads/
+        // uploads" upsell bulletin - it was popping up unprompted during
+        // multi-file downloads.
+        if (true) return;
         final long now = System.currentTimeMillis();
         if (now - ConnectionsManager.lastPremiumFloodWaitShown < 1000L * MessagesController.getInstance(currentAccount).uploadPremiumSpeedupNotifyPeriod) {
             return;

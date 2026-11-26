@@ -13,7 +13,7 @@ public class BlurredBackgroundColorProviderThemed implements BlurredBackgroundCo
     private float alpha;
 
     public BlurredBackgroundColorProviderThemed(Theme.ResourcesProvider resourcesProvider, int backgroundColorId) {
-        this(resourcesProvider, backgroundColorId, org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled() ? 0.85f : 0.76f);
+        this(resourcesProvider, backgroundColorId, org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled() ? 0.1f : 0.76f);
     }
 
     public BlurredBackgroundColorProviderThemed(Theme.ResourcesProvider resourcesProvider, int backgroundColorId, float alpha) {

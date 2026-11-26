@@ -11822,6 +11822,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
     }
 
     public void showPremiumFloodWaitBulletin(final boolean isUpload) {
+        // Mayogram: never show the "Premium required for faster downloads/
+        // uploads" upsell bulletin - it was popping up unprompted during
+        // multi-file downloads.
+        if (true) return;
         if (profileActivity == null) return;
 
 //        final long now = System.currentTimeMillis();

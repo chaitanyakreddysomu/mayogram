@@ -239,7 +239,11 @@ public abstract class BlurredBackgroundDrawable extends Drawable {
         public int padding;
         public boolean hasPadding;
         public int liquidThickness;
-        public float liquidIntensity = 0.75f;
+        // Mayogram: bumped from the stock 0.75/1.5 defaults so the liquid
+        // glass surfaces read as a visibly refractive water-like effect
+        // instead of being subtle enough to still look like plain frosted
+        // blur at a glance.
+        public float liquidIntensity = 0.95f;
         public float liquidIndex = 1.5f;
 
         public float strokeWidthTop;

@@ -780,6 +780,10 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
     }
 
     public void showPremiumFloodWaitBulletin(final boolean isUpload) {
+        // Mayogram: never show the "Premium required for faster downloads/
+        // uploads" upsell bulletin - it was popping up unprompted during
+        // multi-file downloads.
+        if (true) return;
         if (parentFragment == null || !recyclerListView.isAttachedToWindow()) return;
 
         final long now = System.currentTimeMillis();
