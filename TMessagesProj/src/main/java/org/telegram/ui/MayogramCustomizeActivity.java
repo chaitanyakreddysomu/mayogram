@@ -15,11 +15,15 @@ package org.telegram.ui;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -31,6 +35,10 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalFragment;
+import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProviderThemed;
+import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -45,12 +53,19 @@ public class MayogramCustomizeActivity extends UniversalFragment {
     private static final int BUTTON_TITLE_MODE = 5;
     private static final int BUTTON_RESET = 6;
     private static final int SWITCH_LIQUID_GLASS = 7;
+    private static final int SLIDER_LIQUID_GLASS_ALPHA = 8;
 
     private static final int[] SWATCHES = {
             0, // "default" / theme color
             0xFFE53935, 0xFFFB8C00, 0xFFFDD835, 0xFF43A047,
             0xFF00ACC1, 0xFF1E88E5, 0xFF8E24AA, 0xFFD81B60,
     };
+
+    // Mayogram: live glass-tint preview at the top of the Glass Style
+    // section - the slider updates this pill's alpha directly (no list
+    // rebuild) so it tracks the finger while dragging.
+    private BlurredBackgroundColorProviderThemed mayoPreviewColorProvider;
+    private BlurredBackgroundDrawable mayoPreviewDrawable;
 
     @Override
     protected CharSequence getTitle() {
@@ -87,12 +102,69 @@ public class MayogramCustomizeActivity extends UniversalFragment {
         items.add(UItem.asShadow("What shows at the top of your Chats list."));
 
         items.add(UItem.asHeader("GLASS STYLE"));
+        items.add(UItem.asCustom(buildGlassPreview(getContext())));
         items.add(UItem.asSwitch(SWITCH_LIQUID_GLASS, "Liquid Glass")
                 .setChecked(MayogramCustomization.isLiquidGlassEnabled()));
         items.add(UItem.asShadow("Use a liquid glass look instead of frosted glass for the bottom bar, top pill, back and more buttons."));
+        items.add(UItem.asIntSlideView(
+                1,
+                0, MayogramCustomization.getLiquidGlassAlphaPercent(), 60,
+                val -> val + "%",
+                val -> {
+                    MayogramCustomization.setLiquidGlassAlphaPercent(val);
+                    mayoUpdateGlassPreview(val);
+                }
+        ).setMinSliderValue(-1));
+        items.add(UItem.asShadow("How much white tint the glass surfaces keep - lower is more transparent."));
 
         items.add(UItem.asButton(BUTTON_RESET, "Reset to Defaults").red());
         items.add(UItem.asShadow(null));
+    }
+
+    /** A small sample pill over a colorful backdrop, so dragging the alpha slider visibly shows how much of what's behind the glass shows through. */
+    private View buildGlassPreview(Context context) {
+        FrameLayout wrapper = new FrameLayout(context);
+        wrapper.setPadding(dp(16), dp(20), dp(16), dp(12));
+
+        FrameLayout backdrop = new FrameLayout(context);
+        GradientDrawable backdropBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFF5B6EE1, 0xFFE15B94, 0xFFF4B942});
+        backdropBg.setCornerRadius(dp(16));
+        backdrop.setBackground(backdropBg);
+        wrapper.addView(backdrop, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.TOP));
+
+        FrameLayout pill = new FrameLayout(context);
+        BlurredBackgroundSourceColor source = new BlurredBackgroundSourceColor();
+        source.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        mayoPreviewDrawable = source.createDrawable();
+        mayoPreviewColorProvider = new BlurredBackgroundColorProviderThemed(getResourceProvider(), Theme.key_windowBackgroundWhite,
+                MayogramCustomization.getLiquidGlassAlpha());
+        mayoPreviewDrawable.setColorProvider(mayoPreviewColorProvider);
+        mayoPreviewDrawable.setRadius(dp(22));
+        pill.setBackground(mayoPreviewDrawable);
+
+        ImageView icon = new ImageView(context);
+        icon.setImageResource(R.drawable.outline_header_search);
+        icon.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), PorterDuff.Mode.SRC_IN));
+        pill.addView(icon, LayoutHelper.createFrame(24, 24, Gravity.CENTER_VERTICAL | Gravity.LEFT, 14, 0, 0, 0));
+
+        TextView label = new TextView(context);
+        label.setText("Liquid Glass");
+        label.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        label.setTextSize(14);
+        label.setTypeface(AndroidUtilities.bold());
+        pill.addView(label, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+
+        backdrop.addView(pill, LayoutHelper.createFrame(180, 44, Gravity.CENTER));
+        return wrapper;
+    }
+
+    private void mayoUpdateGlassPreview(int alphaPercent) {
+        if (mayoPreviewColorProvider == null || mayoPreviewDrawable == null) {
+            return;
+        }
+        mayoPreviewColorProvider.setAlpha(alphaPercent / 100f);
+        mayoPreviewDrawable.invalidateSelf();
     }
 
     private CharSequence folderColorLabel() {

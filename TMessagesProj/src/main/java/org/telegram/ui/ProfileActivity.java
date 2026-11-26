@@ -54,6 +54,7 @@ import android.graphics.PorterDuffColorFilter;
 import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.LinearGradient;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
@@ -457,6 +458,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private ActionBarMenuItem callItem;
     private ActionBarMenuItem videoCallItem;
     private ActionBarMenuItem editItem;
+    // Mayogram: promoted from a local variable so the deep-scroll
+    // (mediaHeaderVisible) show/hide logic can reference it - it wasn't
+    // being hidden there at all before, so it stayed on screen alongside
+    // the search icon instead of disappearing with editItem/otherItem.
+    private ActionBarMenuItem inviteLinksItem;
     private ActionBarMenuItem otherItem;
     private ActionBarMenuItem searchItem;
     private ActionBarMenuSubItem editColorItem;
@@ -1372,7 +1378,17 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 updateBackgroundPaint();
                 final float progressToGradient = (playProfileAnimation == 0 ? 1f : avatarAnimationProgress) * hasColorAnimated.set(hasColorById);
                 if (progressToGradient < 1) {
+                    // Mayogram: the fully-collapsed header used to be a flat
+                    // opaque rect - make it read as glass (somewhat
+                    // see-through) when Liquid Glass is on, and soften its
+                    // bottom edge with a fade instead of a hard cut.
+                    if (org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled()) {
+                        paint.setAlpha((int) (Color.alpha(currentColor) * 0.55f));
+                    }
                     canvas.drawRect(0, 0, getMeasuredWidth(), y1, paint);
+                    if (org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled()) {
+                        mayoDrawBottomShade(canvas, y1);
+                    }
                 }
                 if (progressToGradient > 0) {
                     backgroundPaint.setAlpha((int) (0xFF * progressToGradient));
@@ -1411,6 +1427,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private Rect blurBounds = new Rect();
+
+        private LinearGradient mayoBottomShadeGradient;
+        private int mayoBottomShadeWidth = -1, mayoBottomShadeY1 = -1;
+        private final Paint mayoBottomShadePaint = new Paint();
+
+        private void mayoDrawBottomShade(Canvas canvas, int y1) {
+            int shadeHeight = Math.min(dp(16), y1);
+            if (mayoBottomShadeGradient == null || mayoBottomShadeWidth != getMeasuredWidth() || mayoBottomShadeY1 != y1) {
+                mayoBottomShadeWidth = getMeasuredWidth();
+                mayoBottomShadeY1 = y1;
+                mayoBottomShadeGradient = new LinearGradient(0, y1 - shadeHeight, 0, y1, 0x00000000, 0x26000000, Shader.TileMode.CLAMP);
+                mayoBottomShadePaint.setShader(mayoBottomShadeGradient);
+            }
+            canvas.drawRect(0, y1 - shadeHeight, getMeasuredWidth(), y1, mayoBottomShadePaint);
+        }
     }
 
     private class OverlaysView extends View implements ProfileGalleryView.Callback {
@@ -2096,6 +2127,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         scrimBlur3Factory.setLinkedViewsRef(new ReferenceList<>());
+        scrimBlur3Factory.setLiquidGlassEffectAllowed(org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled());
     }
 
     @Override
@@ -2506,6 +2538,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             actionBar.setBackButtonDrawable(new BackDrawable(false));
             actionBar.getBackButton().setTranslationX(dp(2));
             ImageView backButton = actionBar.getBackButton();
+            // Mayogram: circular glass pill behind the back button, same
+            // liquid-glass factory the media tabs below already use.
+            backButton.setBackground(iBlur3FactoryLiquidGlass.create(backButton, BlurredBackgroundProviderImpl.topPanel(resourcesProvider))
+                    .setRadius(dp(18))
+                    .setPadding(dp(4)));
             backButton.setOnLongClickListener(e -> {
                 ActionBarPopupWindow menu = BackButtonMenu.show(this, backButton, getDialogId(), getTopicId(), resourcesProvider);
                 if (menu != null) {
@@ -3997,7 +4034,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             editItem = menu.addItem(edit_channel, R.drawable.group_edit_profile);
             editItem.setContentDescription(LocaleController.getString(R.string.Edit));
             if (chatId != 0 && currentChat != null && !isTopic && ChatObject.canAddUsers(currentChat)) {
-                ActionBarMenuItem inviteLinksItem = menu.addItem(invite_links_shortcut, R.drawable.msg_link);
+                inviteLinksItem = menu.addItem(invite_links_shortcut, R.drawable.msg_link);
                 inviteLinksItem.setContentDescription(LocaleController.getString(R.string.InviteLink));
             }
         }
@@ -4021,6 +4058,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         otherItem.addView(ttlIconView, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
         otherItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
         otherItem.setBlurredBackgroundFactory(scrimBlur3Factory, BlurredBackgroundProviderImpl.messageMenuBackground(resourceProvider));
+
+        // Mayogram: whatever's visible on the right (otherItem alone, or
+        // together with editItem/inviteLinksItem for a channel you can
+        // edit) shares one glass pill instead of separate circles - the
+        // LinearLayout menu container sizes itself to only the visible
+        // children, so this works the same whether there's 1 icon or 3.
+        menu.setBackground(iBlur3FactoryLiquidGlass.create(menu, BlurredBackgroundProviderImpl.topPanel(resourcesProvider))
+                .setRadius(dp(18))
+                .setPadding(dp(4)));
 
         int scrollTo;
         int scrollToPosition = 0;
@@ -6328,14 +6374,24 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         final float kx = dpf2(8);
         final float ky = isPulledDown ? dpf2(8) : dpf2(-24);
 
-        final float nameTextViewXEnd = AndroidUtilities.dpf2(18f) - ((FrameLayout.LayoutParams) nameTextView[1].getLayoutParams()).leftMargin;
+        // Mayogram: once fully collapsed, center the title/subtitle between
+        // the back button and the right-side icon pill instead of landing
+        // left-aligned next to the back button - matches the centered
+        // layout used elsewhere (same width-midpoint approach as the
+        // expanded-header centering further down in this file).
+        final boolean mayoCenterCollapsedTitle = org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled() && listView != null;
+        final float nameTextViewXEnd = mayoCenterCollapsedTitle
+                ? listView.getMeasuredWidth() / 2f - (((FrameLayout.LayoutParams) nameTextView[1].getLayoutParams()).leftMargin + nameTextView[1].getExactWidth() * 0.5f)
+                : AndroidUtilities.dpf2(18f) - ((FrameLayout.LayoutParams) nameTextView[1].getLayoutParams()).leftMargin;
         final float nameTextViewYEnd = newTop + extraHeight - getActionsExtraHeight() - AndroidUtilities.dpf2(30f) - nameTextView[1].getBottom();
         final float nameTextViewCx = kx + nameX + (nameTextViewXEnd - nameX) / 2f;
         final float nameTextViewCy = ky + nameY + (nameTextViewYEnd - nameY) / 2f;
         final float nameTextViewX = (1 - value) * (1 - value) * nameX + 2 * (1 - value) * value * nameTextViewCx + value * value * nameTextViewXEnd;
         final float nameTextViewY = (1 - value) * (1 - value) * nameY + 2 * (1 - value) * value * nameTextViewCy + value * value * nameTextViewYEnd;
 
-        final float onlineTextViewXEnd = AndroidUtilities.dpf2(16f) - ((FrameLayout.LayoutParams) onlineTextView[1].getLayoutParams()).leftMargin;
+        final float onlineTextViewXEnd = mayoCenterCollapsedTitle
+                ? listView.getMeasuredWidth() / 2f - (((FrameLayout.LayoutParams) onlineTextView[1].getLayoutParams()).leftMargin + onlineTextView[1].getExactWidth() * 0.5f)
+                : AndroidUtilities.dpf2(16f) - ((FrameLayout.LayoutParams) onlineTextView[1].getLayoutParams()).leftMargin;
         final float onlineTextViewYEnd = newTop + extraHeight - getActionsExtraHeight() - AndroidUtilities.dpf2(10f) - onlineTextView[1].getBottom();
         final float onlineTextViewCx = kx + onlineX + (onlineTextViewXEnd - onlineX) / 2f;
         final float onlineTextViewCy = ky + onlineY + (onlineTextViewYEnd - onlineY) / 2f;
@@ -7818,6 +7874,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (editItemVisible) {
                 editItem.setVisibility(View.VISIBLE);
             }
+            if (editItemVisible && inviteLinksItem != null) {
+                inviteLinksItem.setVisibility(View.VISIBLE);
+            }
             otherItem.setVisibility(View.VISIBLE);
             if (mediaOptionsItem != null) {
                 mediaOptionsItem.setVisibility(View.GONE);
@@ -7852,6 +7911,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         animators.add(ObjectAnimator.ofFloat(videoCallItem, View.ALPHA, visible ? 0.0f : 1.0f));
         animators.add(ObjectAnimator.ofFloat(otherItem, View.ALPHA, visible ? 0.0f : 1.0f));
         animators.add(ObjectAnimator.ofFloat(editItem, View.ALPHA, visible ? 0.0f : 1.0f));
+        if (inviteLinksItem != null) {
+            animators.add(ObjectAnimator.ofFloat(inviteLinksItem, View.ALPHA, visible ? 0.0f : 1.0f));
+            animators.add(ObjectAnimator.ofFloat(inviteLinksItem, View.TRANSLATION_Y, visible ? -AndroidUtilities.dp(10) : 0.0f));
+        }
         animators.add(ObjectAnimator.ofFloat(callItem, View.TRANSLATION_Y, visible ? -AndroidUtilities.dp(10) : 0.0f));
         animators.add(ObjectAnimator.ofFloat(videoCallItem, View.TRANSLATION_Y, visible ? -AndroidUtilities.dp(10) : 0.0f));
         animators.add(ObjectAnimator.ofFloat(otherItem, View.TRANSLATION_Y, visible ? -AndroidUtilities.dp(10) : 0.0f));
@@ -7893,6 +7956,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         }
                         if (editItemVisible) {
                             editItem.setVisibility(View.GONE);
+                        }
+                        if (editItemVisible && inviteLinksItem != null) {
+                            inviteLinksItem.setVisibility(View.GONE);
                         }
                         otherItem.setVisibility(View.GONE);
                     } else {
@@ -11715,14 +11781,17 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             }
                         }
                     } else {
-                        int[] result = new int[1];
-                        String shortNumber = LocaleController.formatShortNumber(chatInfo.participants_count, result);
-                        if (currentChat.megagroup) {
-                            statusString = LocaleController.formatPluralString("Members", chatInfo.participants_count);
-                            profileStatusString = LocaleController.formatPluralStringComma("Members", chatInfo.participants_count);
+                        // Mayogram: permanently show "public/private
+                        // channel" here instead of the subscriber count -
+                        // the count lives in the media-count pill below
+                        // the title instead (see mayoGetMediaCountPillText
+                        // /profileMediaCountPillView).
+                        if (chat.has_geo) {
+                            statusString = profileStatusString = LocaleController.getString(R.string.MegaLocation).toLowerCase();
+                        } else if (ChatObject.isPublic(chat)) {
+                            statusString = profileStatusString = LocaleController.getString(R.string.MegaPublic).toLowerCase();
                         } else {
-                            statusString = LocaleController.formatPluralString("Subscribers", chatInfo.participants_count);
-                            profileStatusString = LocaleController.formatPluralStringComma("Subscribers", chatInfo.participants_count);
+                            statusString = profileStatusString = LocaleController.getString(R.string.MegaPrivate).toLowerCase();
                         }
                     }
                 }
@@ -11880,7 +11949,17 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 onlineTextView[a].setText(a == 0 ? statusText : appendCommunityHiddenRow(statusText));
                             }
                         } else {
-                            onlineTextView[a].setText(LocaleController.formatPluralString("Subscribers", result[0]).replace(String.format("%d", result[0]), shortNumber));
+                            // Mayogram: permanently show "public/private
+                            // channel" instead of the subscriber count here
+                            // too (see the matching fix a few hundred lines
+                            // up in updateProfileData's statusString block).
+                            if (chat.has_geo) {
+                                onlineTextView[a].setText(LocaleController.getString(R.string.MegaLocation).toLowerCase());
+                            } else if (ChatObject.isPublic(chat)) {
+                                onlineTextView[a].setText(LocaleController.getString(R.string.MegaPublic).toLowerCase());
+                            } else {
+                                onlineTextView[a].setText(LocaleController.getString(R.string.MegaPrivate).toLowerCase());
+                            }
                         }
                     } else {
                         onlineTextView[a].setText(a == 0 ? statusString : appendCommunityHiddenRow(profileStatusString));

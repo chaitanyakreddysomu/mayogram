@@ -3596,7 +3596,11 @@ public class ChatActivity extends BaseFragment implements
                 }
 
                 final boolean isThemeLight = themeDelegate != null && !themeDelegate.isDark();
-                if (isThemeLight) {
+                // Mayogram: this flat 216 alpha was overriding the Liquid
+                // Glass alpha (meant to be much more transparent) back to a
+                // near-opaque white wash in light theme - only apply it in
+                // frosted mode.
+                if (isThemeLight && !org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled()) {
                     return ColorUtils.setAlphaComponent(super.getBackgroundColor(), 216);
                 }
                 return super.getBackgroundColor();
@@ -3610,7 +3614,7 @@ public class ChatActivity extends BaseFragment implements
                 }
 
                 final boolean isThemeLight = themeDelegate != null && !themeDelegate.isDark();
-                if (isThemeLight) {
+                if (isThemeLight && !org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled()) {
                     return ColorUtils.setAlphaComponent(super.getBackgroundColor(), 216);
                 }
                 return super.getBackgroundColor();

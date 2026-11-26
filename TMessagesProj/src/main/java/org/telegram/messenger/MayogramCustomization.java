@@ -96,6 +96,19 @@ public class MayogramCustomization {
         prefs().edit().putBoolean("mayo_liquid_glass", enabled).apply();
     }
 
+    /** Stored as a 0-100 percent so it works directly with the Appearance screen's int slider. 10 matches the tuned default tint. */
+    public static int getLiquidGlassAlphaPercent() {
+        return prefs().getInt("mayo_liquid_glass_alpha_percent", 10);
+    }
+
+    public static void setLiquidGlassAlphaPercent(int percent) {
+        prefs().edit().putInt("mayo_liquid_glass_alpha_percent", percent).apply();
+    }
+
+    public static float getLiquidGlassAlpha() {
+        return getLiquidGlassAlphaPercent() / 100f;
+    }
+
     // --- Local Premium: device-only cosmetic toggle, never touches the real
     // account's premium status or anything sent to the server --------------
 

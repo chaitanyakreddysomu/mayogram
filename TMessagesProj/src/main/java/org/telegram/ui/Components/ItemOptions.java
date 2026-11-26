@@ -1487,7 +1487,13 @@ public class ItemOptions {
 
         if (blurForMenu && scrimBlur3SourceBitmap != null) {
             setGapBackgroundColor(Theme.multAlpha(Theme.getColor(Theme.key_actionBarDefaultSubmenuItem, resourcesProvider), 0.06f));
-            BlurredBackgroundDrawable bg = new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap)
+            // Mayogram: this is the default popup background every "..." /
+            // item-options menu across the app falls back to when the
+            // caller doesn't wire its own factory, so this one flag check
+            // is what makes Liquid Glass apply to all of them at once.
+            BlurredBackgroundDrawableViewFactory scrimMenuFactory = new BlurredBackgroundDrawableViewFactory(scrimBlur3SourceBitmap);
+            scrimMenuFactory.setLiquidGlassEffectAllowed(org.telegram.messenger.MayogramCustomization.isLiquidGlassEnabled());
+            BlurredBackgroundDrawable bg = scrimMenuFactory
                 .create(layout, true)
                 .setColorProvider(BlurredBackgroundProviderImpl.scrimMenuBackground(resourcesProvider))
                 .setPadding(dp(8))
